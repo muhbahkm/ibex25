@@ -1,0 +1,100 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Store {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users     User[]
+  customers Customer[]
+  products  Product[]
+  invoices  Invoice[]
+
+  @@map("stores")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  storeId   String
+  createdAt DateTime @default(now())
+
+  store       Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdInvoices Invoice[] @relation("CreatedBy")
+
+  @@map("users")
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  storeId   String
+  isGuest   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@map("customers")
+}
+
+model Product {
+  id        String   @id @default(uuid())
+  name      String
+  price     Decimal  @db.Decimal(10, 2)
+  stock     Int
+  storeId   String
+  createdAt DateTime @default(now())
+
+  store         Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  invoiceItems InvoiceItem[]
+
+  @@map("products")
+}
+
+model Invoice {
+  id          String      @id @default(uuid())
+  storeId     String
+  customerId  String?
+  status      InvoiceStatus @default(UNPAID)
+  totalAmount Decimal     @db.Decimal(10, 2)
+  createdBy   String
+  createdAt   DateTime    @default(now())
+
+  store       Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer    Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  creator     User         @relation("CreatedBy", fields: [createdBy], references: [id])
+  items       InvoiceItem[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id        String   @id @default(uuid())
+  invoiceId String
+  productId String
+  quantity  Int
+  unitPrice Decimal  @db.Decimal(10, 2)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("invoice_items")
+}
+
+enum InvoiceStatus {
+  PAID
+  UNPAID
+  CANCELLED
+}
+
