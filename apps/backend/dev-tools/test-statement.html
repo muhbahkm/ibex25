@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اختبار Statement Endpoint</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 30px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+        .result.show {
+            display: block;
+        }
+        .customer-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .summary-card {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .summary-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .summary-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        .invoices {
+            margin-top: 20px;
+        }
+        .invoice {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .status {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.UNPAID {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .status.PAID {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .status.CANCELLED {
+            background: #fafafa;
+            color: #616161;
+        }
+        .items {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+        .item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 اختبار Statement Endpoint</h1>
+        
+        <div class="input-group">
+            <label for="customerId">Customer ID:</label>
+            <input type="text" id="customerId" placeholder="أدخل Customer ID هنا..." value="192cf664-616c-4c83-a780-a9c9a7e6330b">
+        </div>
+        
+        <button onclick="fetchStatement()">جلب Statement</button>
+        
+        <div id="result" class="result">
+            <div id="loading" class="loading" style="display: none;">
+                ⏳ جاري التحميل...
+            </div>
+            <div id="error" class="error" style="display: none;"></div>
+            <div id="content"></div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchStatement() {
+            const customerId = document.getElementById('customerId').value.trim();
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            const contentDiv = document.getElementById('content');
+            
+            if (!customerId) {
+                alert('الرجاء إدخال Customer ID');
+                return;
+            }
+            
+            resultDiv.classList.add('show');
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            contentDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch(`http://localhost:3000/customers/${customerId}/statement`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Error ${response.status}: ${errorText}`);
+                }
+                
+                const data = await response.json();
+                displayResult(data);
+            } catch (error) {
+                errorDiv.textContent = `خطأ: ${error.message}`;
+                errorDiv.style.display = 'block';
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+        
+        function displayResult(data) {
+            const contentDiv = document.getElementById('content');
+            
+            let html = `
+                <div class="customer-info">
+                    <h2>👤 معلومات العميل</h2>
+                    <p><strong>الاسم:</strong> ${data.customer.name}</p>
+                    <p><strong>المتجر:</strong> ${data.customer.store.name}</p>
+                    <p><strong>تاريخ الإنشاء:</strong> ${new Date(data.customer.createdAt).toLocaleString('ar-SA')}</p>
+                    <p><strong>ضيف:</strong> ${data.customer.isGuest ? 'نعم' : 'لا'}</p>
+                </div>
+                
+                <div class="summary">
+                    <div class="summary-card">
+                        <h3>إجمالي الفواتير</h3>
+                        <div class="value">${data.summary.totalInvoices}</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>غير المدفوعة</h3>
+                        <div class="value">${data.summary.unpaidInvoices}</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>المدفوعة</h3>
+                        <div class="value">${data.summary.paidInvoices}</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>الملغاة</h3>
+                        <div class="value">${data.summary.cancelledInvoices}</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>الرصيد المستحق</h3>
+                        <div class="value">${data.summary.outstandingBalance.toFixed(2)}</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>إجمالي المبيعات</h3>
+                        <div class="value">${data.summary.totalSales.toFixed(2)}</div>
+                    </div>
+                </div>
+                
+                <div class="invoices">
+                    <h2>📋 الفواتير (${data.invoices.length})</h2>
+            `;
+            
+            data.invoices.forEach(invoice => {
+                html += `
+                    <div class="invoice">
+                        <div class="invoice-header">
+                            <div>
+                                <strong>فاتورة #${invoice.id.substring(0, 8)}</strong>
+                                <br>
+                                <small>${new Date(invoice.createdAt).toLocaleString('ar-SA')}</small>
+                            </div>
+                            <div>
+                                <span class="status ${invoice.status}">${invoice.status}</span>
+                                <br>
+                                <strong style="font-size: 18px;">${invoice.totalAmount.toFixed(2)}</strong>
+                            </div>
+                        </div>
+                        <div class="items">
+                            <strong>المنتجات:</strong>
+                            ${invoice.items.map(item => `
+                                <div class="item">
+                                    <span>${item.product.name} × ${item.quantity}</span>
+                                    <span>${item.subtotal.toFixed(2)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                </div>
+                <details style="margin-top: 20px;">
+                    <summary style="cursor: pointer; padding: 10px; background: #f0f0f0; border-radius: 5px;">
+                        عرض JSON الكامل
+                    </summary>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                </details>
+            `;
+            
+            contentDiv.innerHTML = html;
+        }
+        
+        // Allow Enter key to trigger fetch
+        document.getElementById('customerId').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                fetchStatement();
+            }
+        });
+    </script>
+</body>
+</html>
+
