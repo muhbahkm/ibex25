@@ -12,6 +12,7 @@ import { IssueInvoiceDto } from './dto/issue-invoice.dto';
 import { Prisma, InvoiceStatus, PaymentType, LedgerEntryType } from '@prisma/client';
 import { InvoiceStateTransitions } from './utils/invoice-state-transitions';
 import { StoreOwnershipGuard } from './utils/store-ownership.guard';
+import { LedgerGuard } from './utils/ledger-guard';
 
 @Injectable()
 export class InvoicesService {
@@ -506,6 +507,12 @@ export class InvoicesService {
         });
       }
 
+      // F3: Guard against duplicate SALE ledger entry
+      // This check runs inside the same transaction before ledger creation
+      // If a SALE entry already exists, the entire transaction is aborted
+      // This ensures idempotency: retries are safe, duplicates are impossible
+      await LedgerGuard.ensureNoSaleEntry(tx, invoiceId, invoice.storeId);
+
       // F2: Create LedgerEntry (SALE) when invoice is issued
       // Ledger entry is created in the same transaction as invoice update
       // This ensures atomicity: if ledger creation fails, invoice update is rolled back
@@ -619,6 +626,12 @@ export class InvoicesService {
           },
         });
       }
+
+      // F3: Guard against duplicate RECEIPT ledger entry
+      // This check runs inside the same transaction before ledger creation
+      // If a RECEIPT entry already exists, the entire transaction is aborted
+      // This ensures idempotency: retries are safe, duplicates are impossible
+      await LedgerGuard.ensureNoReceiptEntry(tx, invoiceId, invoice.storeId);
 
       // F2: Create LedgerEntry (RECEIPT) when invoice is settled
       // Ledger entry is created in the same transaction as invoice update
