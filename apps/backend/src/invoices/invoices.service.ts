@@ -9,7 +9,7 @@ import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { OperatorContextDto } from './dto/operator-context.dto';
 import { IssueInvoiceDto } from './dto/issue-invoice.dto';
-import { Prisma, InvoiceStatus, PaymentType } from '@prisma/client';
+import { Prisma, InvoiceStatus, PaymentType, LedgerEntryType } from '@prisma/client';
 import { InvoiceStateTransitions } from './utils/invoice-state-transitions';
 import { StoreOwnershipGuard } from './utils/store-ownership.guard';
 
@@ -506,6 +506,19 @@ export class InvoicesService {
         });
       }
 
+      // F2: Create LedgerEntry (SALE) when invoice is issued
+      // Ledger entry is created in the same transaction as invoice update
+      // This ensures atomicity: if ledger creation fails, invoice update is rolled back
+      // Ledger entry reflects the financial event: invoice sale occurred
+      await tx.ledgerEntry.create({
+        data: {
+          storeId: invoice.storeId,
+          invoiceId: invoiceId,
+          type: LedgerEntryType.SALE,
+          amount: invoice.totalAmount,
+        },
+      });
+
       return {
         invoiceId: updatedInvoice.id,
         previousStatus: invoice.status,
@@ -606,6 +619,19 @@ export class InvoicesService {
           },
         });
       }
+
+      // F2: Create LedgerEntry (RECEIPT) when invoice is settled
+      // Ledger entry is created in the same transaction as invoice update
+      // This ensures atomicity: if ledger creation fails, invoice update is rolled back
+      // Ledger entry reflects the financial event: payment received for invoice
+      await tx.ledgerEntry.create({
+        data: {
+          storeId: invoice.storeId,
+          invoiceId: invoiceId,
+          type: LedgerEntryType.RECEIPT,
+          amount: invoice.totalAmount,
+        },
+      });
 
       // Return settlement response
       return {
