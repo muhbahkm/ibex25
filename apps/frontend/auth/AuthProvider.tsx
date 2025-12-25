@@ -3,6 +3,7 @@
 import { ReactNode } from 'react'
 import { AuthContext, AuthContextValue, AuthUser } from './AuthContext'
 import { Role, Permission } from './roles'
+import { getPermissionsForRole } from './role-permissions'
 
 /**
  * Auth Provider
@@ -12,22 +13,21 @@ import { Role, Permission } from './roles'
  *
  * Mock User:
  * - Role: MANAGER
- * - Permissions: ISSUE_INVOICE, SETTLE_INVOICE, VIEW_LEDGER
+ * - Permissions: Derived from role using getPermissionsForRole()
  * - Store ID: hardcoded (will be replaced with real store ID later)
  *
+ * Permissions are always derived from role - never hardcoded per user.
  * This is a scaffold only - no async logic, no API calls, no localStorage.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Hardcoded mock user - no real authentication yet
+  // Permissions are derived from role using centralized mapping
+  const mockRole = Role.MANAGER
   const mockUser: AuthUser = {
     id: 'mock-user-id',
     name: 'مدير النظام',
-    role: Role.MANAGER,
-    permissions: [
-      Permission.ISSUE_INVOICE,
-      Permission.SETTLE_INVOICE,
-      Permission.VIEW_LEDGER,
-    ],
+    role: mockRole,
+    permissions: getPermissionsForRole(mockRole),
     storeId: 'mock-store-id',
   }
 

@@ -272,8 +272,9 @@ export default function Home() {
           </div>
         )}
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-2">
+        {/* Stats Cards - Only visible if user has VIEW_REPORTS permission */}
+        {hasPermission('VIEW_REPORTS') && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-2">
           {/* إجمالي المبيعات */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
@@ -330,7 +331,8 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Invoice Table */}
         {statement && (
