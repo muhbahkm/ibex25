@@ -13,15 +13,15 @@ import { getStoreIdFromRequest } from './tenant-boundary';
  * A reusable guard that enforces tenant (store) boundaries at the controller level.
  *
  * This guard validates that:
- * 1. The request includes a storeId (from operatorContext or headers)
+ * 1. The request includes a storeId (from AuthContext, operatorContext, headers, or query)
  * 2. The storeId matches the expected tenant boundary
- * 3. Cross-store operations are prevented
+ * 3. Cross-store operations are prevented with explicit error code
  *
  * USAGE:
  * ```typescript
  * @UseGuards(StoreScopeGuard)
- * @Controller('invoices')
- * export class InvoicesController {
+ * @Controller('ledger')
+ * export class LedgerController {
  *   // All routes in this controller will be protected
  * }
  * ```
@@ -33,8 +33,7 @@ import { getStoreIdFromRequest } from './tenant-boundary';
  * async issue(...) { ... }
  * ```
  *
- * NOTE: This guard is prepared for S1 but NOT yet applied to existing controllers.
- * It will be integrated in future phases when refactoring controllers.
+ * S2: Enhanced with AuthContext support, error codes, and logging.
  */
 @Injectable()
 export class StoreScopeGuard implements CanActivate {
@@ -46,34 +45,79 @@ export class StoreScopeGuard implements CanActivate {
    */
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
-    const storeId = this.extractStoreId(request);
+    const requestId = request['requestId'] || 'unknown';
 
-    if (!storeId) {
-      throw new ForbiddenException(
-        'Store ID is required. Please provide storeId in operatorContext or request headers.',
-      );
+    // Extract storeId from AuthContext (future) or current sources
+    const authStoreId = this.extractStoreIdFromAuthContext(request);
+    const requestStoreId = this.extractStoreId(request);
+
+    // Use AuthContext.storeId if available, otherwise fall back to request sources
+    const operatorStoreId = authStoreId || requestStoreId;
+
+    if (!operatorStoreId) {
+      throw new ForbiddenException({
+        message:
+          'Store ID is required. Please provide storeId in operatorContext, request headers, or query parameters.',
+        code: 'STORE_ID_REQUIRED',
+      });
     }
 
     // Validate storeId format (UUID)
-    if (!this.isValidUUID(storeId)) {
-      throw new ForbiddenException(
-        `Invalid storeId format: ${storeId}. Store ID must be a valid UUID.`,
-      );
+    if (!this.isValidUUID(operatorStoreId)) {
+      throw new ForbiddenException({
+        message: `Invalid storeId format: ${operatorStoreId}. Store ID must be a valid UUID.`,
+        code: 'INVALID_STORE_ID_FORMAT',
+      });
     }
 
-    // Attach storeId to request for use in controllers/services
-    request['storeId'] = storeId;
+    // Check for cross-tenant access attempts
+    // If request includes a target storeId (in query/params), validate it matches operator's store
+    const targetStoreId = this.extractTargetStoreId(request);
+    if (targetStoreId && targetStoreId !== operatorStoreId) {
+      // Log the blocked attempt
+      console.warn(
+        `[${requestId}] CROSS_TENANT_ACCESS_DENIED: Operator storeId=${operatorStoreId}, Attempted storeId=${targetStoreId}, Path=${request.path}`,
+      );
+
+      throw new ForbiddenException({
+        message: `Access denied. You do not have permission to access resources from store ${targetStoreId}.`,
+        code: 'CROSS_TENANT_ACCESS_DENIED',
+      });
+    }
+
+    // Attach validated storeId to request for use in controllers/services
+    request['storeId'] = operatorStoreId;
+    request['authStoreId'] = authStoreId; // Store AuthContext storeId separately if available
 
     return true;
   }
 
   /**
-   * Extract storeId from request
+   * Extract storeId from AuthContext (future auth system)
+   *
+   * Priority: AuthContext.storeId (when auth system is implemented)
+   * Currently returns null as AuthContext is not yet implemented.
+   *
+   * @param request - Express request object
+   * @returns storeId from AuthContext, or null if not available
+   */
+  private extractStoreIdFromAuthContext(request: Request): string | null {
+    // TODO: Extract from AuthContext when auth system is implemented
+    // For now, AuthContext is not available, so return null
+    // Future implementation:
+    // const authContext = request['authContext'] as AuthContext | undefined;
+    // return authContext?.storeId || null;
+    return null;
+  }
+
+  /**
+   * Extract storeId from request (fallback when AuthContext not available)
    *
    * Priority order:
    * 1. operatorContext.storeId (from request body)
    * 2. x-store-id header (for future auth system)
-   * 3. storeId in request body (direct)
+   * 3. storeId in query parameters
+   * 4. storeId in request body (direct)
    */
   private extractStoreId(request: Request): string | null {
     // Try operatorContext first (current implementation)
@@ -87,9 +131,37 @@ export class StoreScopeGuard implements CanActivate {
       return headerStoreId;
     }
 
+    // Try query parameters (for GET requests like /ledger?storeId=...)
+    if (request.query?.storeId && typeof request.query.storeId === 'string') {
+      return request.query.storeId;
+    }
+
     // Try direct storeId in body (fallback)
     if (request.body?.storeId) {
       return request.body.storeId;
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract target storeId from request (for cross-tenant validation)
+   *
+   * This checks if the request is trying to access a specific store's resources.
+   * Used to detect cross-tenant access attempts.
+   *
+   * @param request - Express request object
+   * @returns target storeId if present in query/params, null otherwise
+   */
+  private extractTargetStoreId(request: Request): string | null {
+    // Check query parameters (e.g., /ledger?storeId=...)
+    if (request.query?.storeId && typeof request.query.storeId === 'string') {
+      return request.query.storeId;
+    }
+
+    // Check route parameters (e.g., /stores/:storeId/...)
+    if (request.params?.storeId) {
+      return request.params.storeId;
     }
 
     return null;

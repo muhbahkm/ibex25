@@ -1,14 +1,18 @@
-import { Controller, Get, Query, Res, Header } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Query, Res, Header, UseGuards, Req } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { LedgerService } from './ledger.service';
 import { LedgerQueryDto } from './dto/ledger-query.dto';
+import { StoreScopeGuard } from '../core/store-scope.guard';
 
 /**
  * Ledger Controller
  *
  * Provides read-only access to ledger entries.
  * Ledger entries are append-only financial events (SALE, RECEIPT).
+ *
+ * S2: Protected with StoreScopeGuard to enforce tenant isolation.
  */
+@UseGuards(StoreScopeGuard)
 @Controller('ledger')
 export class LedgerController {
   constructor(private readonly ledgerService: LedgerService) {}
@@ -60,9 +64,17 @@ export class LedgerController {
    * - CSV format: Date,Type,Amount
    */
   @Get()
-  async findAll(@Query() query: LedgerQueryDto, @Res() res: Response) {
+  async findAll(
+    @Query() query: LedgerQueryDto,
+    @Req() request: Request,
+    @Res() res: Response,
+  ) {
+    // S2: Use storeId from request (set by StoreScopeGuard) instead of query
+    // This ensures the storeId has been validated by the guard
+    const storeId = request['storeId'] || query.storeId;
+
     const entries = await this.ledgerService.findAll(
-      query.storeId,
+      storeId,
       query.fromDate,
       query.toDate,
     );

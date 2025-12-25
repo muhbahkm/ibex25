@@ -245,22 +245,59 @@ Multiple layers of protection:
 
 ---
 
-## Migration Path
+## Enforcement Rollout Strategy
 
-### Current State (S1)
+### Staged Enforcement Approach
 
+Tenant isolation enforcement is being rolled out in a controlled, staged manner to minimize risk and allow for gradual validation.
+
+**Phase S1 (Foundations):**
 - Tenant boundaries defined and documented
 - Store isolation enforced at service layer
 - Request correlation implemented
 - Environment validation hardened
 - Guards prepared (not yet applied)
 
+**Phase S2 (Controlled Enforcement):**
+- `StoreScopeGuard` applied to `LedgerController` only
+- Enhanced guard with AuthContext support (prepared, not yet active)
+- Cross-tenant access detection with explicit error codes
+- Logging of blocked access attempts
+- **InvoicesController intentionally NOT protected yet** (to avoid disruption)
+
+**Why Partial Enforcement?**
+1. **Risk Mitigation**: Ledger is read-only, making it safer for initial enforcement
+2. **Validation**: Allows testing enforcement logic before broader rollout
+3. **Gradual Migration**: Gives time to validate behavior and fix edge cases
+4. **Business Continuity**: Critical operations (invoices) remain unchanged during validation
+
+**Future Phases:**
+- **S3:** Apply `StoreScopeGuard` to remaining controllers (Invoices, Customers, etc.)
+- **S4:** Implement authentication system with JWT
+- **S5:** Remove `operatorContext` from request bodies
+- **S6:** Add tenant-level configuration
+
+---
+
+## Migration Path
+
+### Current State (S2)
+
+- Tenant boundaries defined and documented
+- Store isolation enforced at service layer
+- Request correlation implemented
+- Environment validation hardened
+- `StoreScopeGuard` applied to `LedgerController` (S2)
+- Enhanced guard with AuthContext support (prepared)
+- Cross-tenant access detection with error codes
+- Logging of blocked requests
+
 ### Future Phases
 
-- **S2:** Apply `StoreScopeGuard` to all controllers
-- **S3:** Implement authentication system with JWT
-- **S4:** Remove `operatorContext` from request bodies
-- **S5:** Add tenant-level configuration
+- **S3:** Apply `StoreScopeGuard` to all remaining controllers
+- **S4:** Implement authentication system with JWT
+- **S5:** Remove `operatorContext` from request bodies
+- **S6:** Add tenant-level configuration
 
 ---
 
@@ -274,5 +311,5 @@ Multiple layers of protection:
 ---
 
 **Last Updated:** 2025-12-25  
-**Phase:** S1 - SaaS Readiness Foundations
+**Phase:** S2 - SaaS Enforcement (Controlled)
 
