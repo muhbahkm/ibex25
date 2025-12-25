@@ -17,6 +17,7 @@ model Store {
   users         User[]
   payments      Payment[]
   ledgerEntries LedgerEntry[]
+  auditLogs     AuditLog[]
 
   @@map("stores")
 }
@@ -140,4 +141,50 @@ model LedgerEntry {
   invoice   Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@map("ledger_entries")
+}
+
+// Audit Log Model - Immutable audit trail of all critical operations
+model AuditLog {
+  id         String   @id @default(uuid())
+  storeId   String
+  userId    String
+  action    String
+  entityType String
+  entityId  String
+  metadata  Json?
+  createdAt DateTime  @default(now())
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
+
+// Plan Model - B1: Subscription plan definitions (FOUNDATION ONLY: No pricing, no billing cycles)
+model Plan {
+  id          String              @id @default(uuid())
+  code        String              @unique
+  name        String
+  description String?
+  limits      Json                // e.g. { invoicesPerMonth: 500, users: 3 }
+  features    Json                // e.g. { ledger: true, reports: true }
+  createdAt   DateTime            @default(now())
+  subscriptions StoreSubscription[]
+
+  @@map("plans")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+// Store Subscription Model - B1: Links Store to Plan (FOUNDATION ONLY: No billing cycles, no expiration)
+model StoreSubscription {
+  id        String              @id @default(uuid())
+  storeId   String              @unique
+  planId    String
+  startedAt DateTime            @default(now())
+  status    SubscriptionStatus  @default(ACTIVE)
+  plan      Plan                @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@map("store_subscriptions")
 }

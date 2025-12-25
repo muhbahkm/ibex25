@@ -11,6 +11,7 @@ import {
 } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { RequirePermission } from '@/auth/RequirePermission'
+import { useBilling } from '@/billing/useBilling'
 
 interface DashboardState {
   totalSales: number
@@ -31,6 +32,9 @@ export default function Home() {
     null,
   )
   const [error, setError] = useState<string | null>(null)
+  
+  // B1: Fetch billing plan information
+  const { plan: billingPlan, loading: loadingPlan } = useBilling()
 
   useEffect(() => {
     let isMounted = true
@@ -214,7 +218,16 @@ export default function Home() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">لوحة التحكم</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-gray-900">لوحة التحكم</h1>
+            {/* B1: Show current plan name */}
+            {!loadingPlan && billingPlan && (
+              <div className="text-sm text-gray-600">
+                <span className="font-medium">الخطة:</span>{' '}
+                <span className="text-gray-900">{billingPlan.plan.name}</span>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

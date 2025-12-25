@@ -213,3 +213,62 @@ export async function fetchLedgerEntries(
 
   return body.data
 }
+
+// B1: Billing API
+export interface StorePlan {
+  plan: {
+    code: string
+    name: string
+    description?: string
+  }
+  limits: {
+    invoicesPerMonth?: number
+    users?: number
+    [key: string]: number | undefined
+  }
+  features: {
+    ledger?: boolean
+    reports?: boolean
+    [key: string]: boolean | undefined
+  }
+  usage: {
+    invoicesThisMonth: number
+    usersCount: number
+    [key: string]: number
+  }
+}
+
+interface BillingResponse {
+  success: boolean
+  data?: StorePlan
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchStorePlan(): Promise<StorePlan> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/billing/plan`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    throw new Error('تعذر جلب معلومات الخطة من الخادم.')
+  }
+
+  const body = (await res.json()) as BillingResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب معلومات الخطة.'
+    throw new Error(message)
+  }
+
+  return body.data
+}

@@ -390,5 +390,101 @@ This logging includes:
 ---
 
 **Last Updated:** 2025-12-25  
-**Phase:** S3 - Invoice Domain Hardening
+**Phase:** B1 - Billing & Plans (Foundation Only)
+
+---
+
+## Billing & Plans (Foundation Only) - B1
+
+### Overview
+
+Phase B1 introduces the foundation for billing and plans in IBEX. **This is NOT billing yet** - it's infrastructure preparation for future monetization.
+
+### What B1 Provides
+
+- **Plan Definitions**: Subscription plans with limits and features
+- **Store Subscriptions**: Link stores (tenants) to plans (1:1 relationship)
+- **Usage Resolution**: Compute usage dynamically from existing data (read-only)
+- **Soft Enforcement**: Warn/error when limits are exceeded (no billing)
+
+### What B1 Does NOT Provide
+
+- ❌ Payments
+- ❌ Stripe / PayPal / gateways
+- ❌ Invoices for subscriptions
+- ❌ Auto-upgrades / downgrades
+- ❌ Background jobs
+- ❌ Emails / notifications
+
+### Architecture
+
+**Database Models:**
+- `Plan`: Plan definitions with limits (JSON) and features (JSON)
+- `StoreSubscription`: Links store to plan (1:1 relationship)
+- `SubscriptionStatus`: ACTIVE | SUSPENDED
+
+**Backend Services:**
+- `PlansService`: Plan CRUD operations
+- `SubscriptionsService`: Subscription management
+- `UsageResolver`: Read-only usage computation from existing data
+- `PlanLimitGuard`: Soft enforcement guard (applied to POST /invoices/:id/issue)
+
+**API Endpoints:**
+- `GET /billing/plan`: Returns current plan, limits, features, and usage
+
+**Frontend:**
+- `useBilling` hook: Fetches and exposes plan information
+- Plan name displayed in dashboard header
+
+### Why This is Not Billing Yet
+
+B1 is **infrastructure only**:
+- No pricing fields in schema
+- No billing cycles
+- No expiration dates
+- No payment tracking
+- No charging logic
+
+This phase prepares the system for monetization without touching accounting logic or breaking existing contracts.
+
+### Soft Enforcement
+
+Plan limits are enforced **softly**:
+- If limit exceeded → `403 Forbidden` with `PLAN_LIMIT_EXCEEDED` error code
+- No automatic upgrades
+- No billing
+- No blocking of existing operations (graceful degradation)
+
+**Applied Only To:**
+- `POST /invoices/:id/issue` (invoice issuance)
+
+**Not Applied To:**
+- Other invoice operations
+- Other endpoints
+- Background jobs
+
+### Usage Resolution
+
+Usage is computed **dynamically** from existing data:
+- `invoicesThisMonth`: Count of issued invoices this month
+- `usersCount`: Count of users in the store
+- No counters table
+- No writes
+- Read-only computation
+
+### Future Phases
+
+- **B2**: Payment integration (Stripe)
+- **B3**: Billing cycles and invoicing
+- **B4**: Auto-upgrades / downgrades
+- **B5**: Usage-based billing
+
+### Contract Safety
+
+B1 respects all frozen contracts:
+- ✅ No invoice lifecycle changes
+- ✅ No ledger invariant changes
+- ✅ No API contract changes
+- ✅ No multi-tenant isolation breaks
+- ✅ No accounting logic modifications
 

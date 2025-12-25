@@ -4,11 +4,12 @@ import { AppService } from './app.service';
 import { InvoicesModule } from './invoices/invoices.module';
 import { CustomersModule } from './customers/customers.module';
 import { LedgerModule } from './ledger/ledger.module';
+import { BillingModule } from './billing/billing.module';
 import { PrismaService } from './prisma.service';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
-  imports: [InvoicesModule, CustomersModule, LedgerModule],
+  imports: [InvoicesModule, CustomersModule, LedgerModule, BillingModule],
   controllers: [AppController],
   providers: [AppService, PrismaService],
 })

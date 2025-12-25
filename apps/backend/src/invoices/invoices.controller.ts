@@ -14,12 +14,14 @@ import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { OperatorContextDto } from './dto/operator-context.dto';
 import { IssueInvoiceDto } from './dto/issue-invoice.dto';
 import { StoreScopeGuard } from '../core/store-scope.guard';
+import { PlanLimitGuard } from '../billing/guards/plan-limit.guard';
 
 /**
  * Invoices Controller
  *
  * S3: Protected with StoreScopeGuard to enforce tenant isolation at controller level.
  * Additional enforcement exists at service layer (defense in depth).
+ * B1: PlanLimitGuard applied to issue endpoint for soft enforcement.
  */
 @UseGuards(StoreScopeGuard)
 @Controller('invoices')
@@ -89,8 +91,11 @@ export class InvoicesController {
    * - Issue is an atomic transaction
    * - Operator must belong to invoice's store
    *
+   * B1: Protected with PlanLimitGuard for soft enforcement of plan limits.
+   *
    * Requires operatorContext in request body.
    */
+  @UseGuards(PlanLimitGuard)
   @Post(':invoiceId/issue')
   @HttpCode(HttpStatus.OK)
   async issue(
