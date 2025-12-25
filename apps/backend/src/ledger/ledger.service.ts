@@ -18,20 +18,55 @@ export class LedgerService {
    * Returns all ledger entries for the operator's store,
    * ordered by createdAt DESC (most recent first).
    *
+   * Optional date range filtering:
+   * - If fromDate provided: createdAt >= fromDate
+   * - If toDate provided: createdAt <= toDate
+   * - If both provided: fromDate <= createdAt <= toDate
+   *
    * Rules:
    * - Read-only (no mutations)
    * - Store ownership enforced
    * - No calculations, totals, or balances
-   * - No filtering or pagination
+   * - No pagination
    */
-  async findAll(operatorStoreId: string) {
+  async findAll(
+    operatorStoreId: string,
+    fromDate?: string,
+    toDate?: string,
+  ) {
     // Store ownership is enforced at the service level
     // All ledger entries must belong to the operator's store
 
+    // Build date filter if dates are provided
+    const dateFilter: {
+      gte?: Date;
+      lte?: Date;
+    } = {};
+
+    if (fromDate) {
+      dateFilter.gte = new Date(fromDate);
+    }
+
+    if (toDate) {
+      // Include the entire day by setting to end of day
+      const endDate = new Date(toDate);
+      endDate.setHours(23, 59, 59, 999);
+      dateFilter.lte = endDate;
+    }
+
+    const whereClause: {
+      storeId: string;
+      createdAt?: { gte?: Date; lte?: Date };
+    } = {
+      storeId: operatorStoreId,
+    };
+
+    if (fromDate || toDate) {
+      whereClause.createdAt = dateFilter;
+    }
+
     const ledgerEntries = await this.prisma.ledgerEntry.findMany({
-      where: {
-        storeId: operatorStoreId,
-      },
+      where: whereClause,
       orderBy: {
         createdAt: 'desc',
       },

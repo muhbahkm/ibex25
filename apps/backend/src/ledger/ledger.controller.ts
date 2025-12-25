@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { LedgerService } from './ledger.service';
-import { OperatorContextDto } from '../invoices/dto/operator-context.dto';
+import { LedgerQueryDto } from './dto/ledger-query.dto';
 
 /**
  * Ledger Controller
@@ -20,32 +20,41 @@ export class LedgerController {
    * ordered by createdAt DESC (most recent first).
    *
    * Query Parameters:
-   * - storeId: UUID of the store
-   * - operatorId: UUID of the operator
+   * - storeId: UUID of the store (required)
+   * - operatorId: UUID of the operator (required)
+   * - fromDate: ISO 8601 date string (optional)
+   * - toDate: ISO 8601 date string (optional)
+   *
+   * Date Range Filtering:
+   * - If fromDate provided: createdAt >= fromDate
+   * - If toDate provided: createdAt <= toDate
+   * - If both provided: fromDate <= createdAt <= toDate
+   * - If neither provided: return all entries
    *
    * Security:
    * - Store ownership is enforced
    * - Only ledger entries belonging to the operator's store are returned
    *
    * Response:
-   * [
-   *   {
-   *     id: string,
-   *     type: "SALE" | "RECEIPT",
-   *     amount: number,
-   *     createdAt: string
-   *   }
-   * ]
+   * {
+   *   success: true,
+   *   data: [
+   *     {
+   *       id: string,
+   *       type: "SALE" | "RECEIPT",
+   *       amount: number,
+   *       createdAt: string
+   *     }
+   *   ]
+   * }
    */
   @Get()
-  async findAll(@Query() query: OperatorContextDto) {
-    // Validate query parameters
-    const operatorContext: OperatorContextDto = {
-      operatorId: query.operatorId,
-      storeId: query.storeId,
-    };
-
-    return this.ledgerService.findAll(operatorContext.storeId);
+  async findAll(@Query() query: LedgerQueryDto) {
+    return this.ledgerService.findAll(
+      query.storeId,
+      query.fromDate,
+      query.toDate,
+    );
   }
 }
 

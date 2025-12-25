@@ -166,9 +166,24 @@ interface LedgerResponse {
 export async function fetchLedgerEntries(
   storeId: string,
   operatorId: string,
+  fromDate?: string,
+  toDate?: string,
 ): Promise<LedgerEntry[]> {
   const baseUrl = getApiBaseUrl()
-  const url = `${baseUrl}/ledger?storeId=${encodeURIComponent(storeId)}&operatorId=${encodeURIComponent(operatorId)}`
+  const params = new URLSearchParams({
+    storeId,
+    operatorId,
+  })
+
+  if (fromDate) {
+    params.append('fromDate', fromDate)
+  }
+
+  if (toDate) {
+    params.append('toDate', toDate)
+  }
+
+  const url = `${baseUrl}/ledger?${params.toString()}`
 
   const res = await fetch(url, {
     method: 'GET',

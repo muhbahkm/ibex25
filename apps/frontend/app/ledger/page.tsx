@@ -24,42 +24,56 @@ export default function LedgerPage() {
   const [entries, setEntries] = useState<LedgerEntry[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [fromDate, setFromDate] = useState<string>('')
+  const [toDate, setToDate] = useState<string>('')
 
-  useEffect(() => {
+  async function loadLedgerEntries() {
     let isMounted = true
 
-    async function loadLedgerEntries() {
-      try {
-        setIsLoading(true)
-        setError(null)
+    try {
+      setIsLoading(true)
+      setError(null)
 
-        const ledgerEntries = await fetchLedgerEntries(
-          user.storeId,
-          user.id,
-        )
+      // Convert date strings to ISO format if provided
+      const fromDateISO = fromDate ? new Date(fromDate).toISOString() : undefined
+      const toDateISO = toDate ? new Date(toDate).toISOString() : undefined
 
-        if (!isMounted) return
+      const ledgerEntries = await fetchLedgerEntries(
+        user.storeId,
+        user.id,
+        fromDateISO,
+        toDateISO,
+      )
 
-        setEntries(ledgerEntries)
-      } catch (err) {
-        if (!isMounted) return
+      if (!isMounted) return
 
-        const message =
-          err instanceof Error ? err.message : 'فشل تحميل بيانات السجل المالي.'
-        setError(message)
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
-        }
+      setEntries(ledgerEntries)
+    } catch (err) {
+      if (!isMounted) return
+
+      const message =
+        err instanceof Error ? err.message : 'فشل تحميل بيانات السجل المالي.'
+      setError(message)
+    } finally {
+      if (isMounted) {
+        setIsLoading(false)
       }
     }
-
-    loadLedgerEntries()
 
     return () => {
       isMounted = false
     }
+  }
+
+  useEffect(() => {
+    loadLedgerEntries()
   }, [user.storeId, user.id])
+
+  const handleFilter = (e: React.FormEvent) => {
+    e.preventDefault()
+    loadLedgerEntries()
+  }
+
 
   return (
     <RequirePermission permission="VIEW_LEDGER">
@@ -81,6 +95,65 @@ export default function LedgerPage() {
               <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
+
+          {/* Date Range Filter */}
+          <div className="mb-4 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <form onSubmit={handleFilter} className="flex flex-wrap gap-4 items-end">
+              <div className="flex-1 min-w-[200px]">
+                <label
+                  htmlFor="fromDate"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  من تاريخ
+                </label>
+                <input
+                  type="date"
+                  id="fromDate"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <label
+                  htmlFor="toDate"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  إلى تاريخ
+                </label>
+                <input
+                  type="date"
+                  id="toDate"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'جاري التحميل...' : 'تصفية'}
+                </button>
+                {(fromDate || toDate) && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setFromDate('')
+                      setToDate('')
+                      // Refetch with cleared dates
+                      await loadLedgerEntries()
+                    }}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  >
+                    مسح
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
 
           {/* Ledger Table */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
