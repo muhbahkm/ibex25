@@ -7,6 +7,15 @@ import { StoreOwnershipGuard } from '../invoices/utils/store-ownership.guard';
  *
  * Provides read-only access to ledger entries.
  * Ledger entries are append-only financial events (SALE, RECEIPT).
+ *
+ * ⚠️ CONTRACT FROZEN: Ledger invariants
+ * - Ledger is append-only (no updates, no deletes)
+ * - No balances stored (ledger is event log, not balance sheet)
+ * - No recalculation allowed (entries are immutable)
+ * - SALE happens only at ISSUE (one per invoice)
+ * - RECEIPT happens only at SETTLE (one per invoice)
+ * - No totals, no grouping, no aggregation
+ * Do not change these invariants without version bump.
  */
 @Injectable()
 export class LedgerService {

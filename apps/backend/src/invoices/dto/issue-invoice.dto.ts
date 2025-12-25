@@ -11,6 +11,11 @@ import { OperatorContextDto } from './operator-context.dto';
  * Rules:
  * - CASH → invoice ends as PAID
  * - CREDIT → invoice ends as UNPAID
+ *
+ * ⚠️ CONTRACT: Do not change without version bump
+ * - paymentType: Must be CASH | CREDIT (enum values frozen)
+ * - Extends OperatorContextDto (operatorId, storeId)
+ * - This DTO is validated against AuthContext from headers
  */
 export class IssueInvoiceDto extends OperatorContextDto {
   @IsEnum(PaymentType, {

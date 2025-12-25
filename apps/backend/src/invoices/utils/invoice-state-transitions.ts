@@ -18,6 +18,10 @@ import { InvoiceStatus } from '@prisma/client';
  * - PAID → ISSUED
  * - CANCELLED → any state
  * - Any modification after ISSUED (except state transitions)
+ *
+ * ⚠️ CONTRACT FROZEN: This lifecycle is a core invariant.
+ * Do not change state transitions without version bump.
+ * This is constitutional law for the invoice domain.
  */
 export class InvoiceStateTransitions {
   /**

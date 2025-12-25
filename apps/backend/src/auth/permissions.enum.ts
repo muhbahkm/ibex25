@@ -2,14 +2,16 @@
  * Permissions Enum
  *
  * Defines granular permissions for operations in IBEX.
- * Permissions are semantic and will be enforced in future phases.
+ * Permissions are semantic and enforced via PermissionsGuard.
  *
  * Permission Categories:
  * - Invoice Operations: ISSUE_INVOICE, SETTLE_INVOICE, CANCEL_INVOICE
  * - View Operations: VIEW_LEDGER, VIEW_REPORTS
  *
- * Note: This is a skeleton. Permission enforcement will be added in future phases.
- * Currently, all operations use OperatorContext which is passed explicitly.
+ * ⚠️ CONTRACT FROZEN: Permission enum values are frozen.
+ * Do not add, remove, or rename permissions without version bump.
+ * Must match frontend permission type in apps/frontend/auth/roles.ts
+ * Role → Permission mapping is in apps/backend/src/auth/role-permissions.ts
  */
 export enum Permission {
   // Invoice Operations

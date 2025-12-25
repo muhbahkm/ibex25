@@ -10,7 +10,9 @@
  * - CASHIER: Point-of-sale operations, can issue invoices
  * - AUDITOR: Read-only access, can view reports and ledger
  *
- * Note: This is a skeleton. Role enforcement will be added in future phases.
+ * ⚠️ CONTRACT FROZEN: Role enum values are frozen.
+ * Do not add, remove, or rename roles without version bump.
+ * Must match frontend role enum in apps/frontend/auth/roles.ts
  */
 export enum Role {
   OWNER = 'OWNER',

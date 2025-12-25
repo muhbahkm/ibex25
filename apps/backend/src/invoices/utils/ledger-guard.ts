@@ -13,6 +13,12 @@ import { PrismaClient, LedgerEntryType } from '@prisma/client';
  * - All checks must run inside the same transaction
  * - Failures throw domain errors (400 or 409)
  *
+ * ⚠️ CONTRACT FROZEN: These invariants are non-negotiable.
+ * - One SALE per invoice (created at ISSUE)
+ * - One RECEIPT per invoice (created at SETTLE)
+ * - Ledger is append-only (no updates, no deletes)
+ * Do not change these rules without version bump.
+ *
  * This is constitutional law, not application logic.
  * If Ledger lies, reports lie, audits fail, trust collapses.
  */
