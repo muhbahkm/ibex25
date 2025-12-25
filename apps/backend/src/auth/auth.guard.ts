@@ -1,58 +1,104 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Request } from 'express';
 import { AuthContext } from './auth-context.interface';
+import { Role } from './roles.enum';
+import { getPermissionsForRole } from './role-permissions';
 
 /**
- * Auth Guard (Stub Implementation)
+ * Auth Guard (Real Implementation)
  *
- * This is a placeholder guard that does NOT enforce authentication yet.
- * It is designed to document future enforcement points without changing current behavior.
+ * Enforces authentication by reading auth headers and building AuthContext.
+ * This is a temporary header-based implementation before JWT is introduced.
  *
- * Current Behavior:
- * - Always allows requests
- * - No JWT parsing
- * - No header validation
- * - No permission checks
+ * Required Headers:
+ * - x-user-id: UUID of the authenticated user
+ * - x-store-id: UUID of the store the user belongs to
+ * - x-role: User's role (OWNER | MANAGER | CASHIER | AUDITOR)
  *
- * Future Enforcement Points (documented for future implementation):
- * 1. Extract JWT from Authorization header
- * 2. Validate JWT signature and expiration
- * 3. Extract AuthContext from JWT payload
- * 4. Attach AuthContext to request object
- * 5. Enforce permissions based on role and permissions array
- * 6. Reject requests with invalid/missing tokens
+ * Behavior:
+ * - Extracts headers from request
+ * - Validates headers are present and valid
+ * - Builds AuthContext with role-derived permissions
+ * - Attaches AuthContext to request.auth
+ * - Throws 401 Unauthorized if headers are missing or invalid
  *
- * Integration Points:
- * - Will replace explicit OperatorContext passing
- * - Will integrate with User model from Prisma
- * - Will enforce role-based access control (RBAC)
- * - Will enforce permission-based access control (PBAC)
- *
- * Note: This guard is NOT used anywhere yet. It exists as scaffolding.
+ * Migration Path:
+ * - Phase 1 (Current): Header-based auth (temporary, explicit)
+ * - Phase 2 (Future): JWT-based auth (replaces headers)
+ * - Phase 3 (Future): Session-based auth (optional)
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    // FUTURE: Extract AuthContext from request
-    // const request = context.switchToHttp().getRequest();
-    // const authContext: AuthContext = this.extractAuthContext(request);
+    const request = context.switchToHttp().getRequest<Request & { auth?: AuthContext }>();
     
-    // FUTURE: Validate AuthContext
-    // if (!authContext) {
-    //   throw new UnauthorizedException('Authentication required');
-    // }
-    
-    // FUTURE: Attach AuthContext to request
-    // request.authContext = authContext;
-    
-    // CURRENT: Always allow (no enforcement yet)
+    // Extract headers
+    const userId = request.headers['x-user-id'] as string;
+    const storeId = request.headers['x-store-id'] as string;
+    const role = request.headers['x-role'] as string;
+
+    // Validate headers are present
+    if (!userId || !storeId || !role) {
+      throw new UnauthorizedException({
+        success: false,
+        error: {
+          code: 'AUTH_HEADERS_MISSING',
+          message: 'Authentication headers are required. Please provide x-user-id, x-store-id, and x-role headers.',
+        },
+      });
+    }
+
+    // Validate userId and storeId are valid UUIDs (basic format check)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userId)) {
+      throw new UnauthorizedException({
+        success: false,
+        error: {
+          code: 'AUTH_INVALID_USER_ID',
+          message: 'Invalid user ID format. User ID must be a valid UUID.',
+        },
+      });
+    }
+
+    if (!uuidRegex.test(storeId)) {
+      throw new UnauthorizedException({
+        success: false,
+        error: {
+          code: 'AUTH_INVALID_STORE_ID',
+          message: 'Invalid store ID format. Store ID must be a valid UUID.',
+        },
+      });
+    }
+
+    // Validate role is a valid Role enum value
+    const validRoles = Object.values(Role);
+    if (!validRoles.includes(role as Role)) {
+      throw new UnauthorizedException({
+        success: false,
+        error: {
+          code: 'AUTH_INVALID_ROLE',
+          message: `Invalid role. Role must be one of: ${validRoles.join(', ')}`,
+        },
+      });
+    }
+
+    // Build AuthContext
+    const authContext: AuthContext = {
+      userId,
+      storeId,
+      role: role as Role,
+      permissions: getPermissionsForRole(role as Role),
+    };
+
+    // Attach AuthContext to request
+    request.auth = authContext;
+
     return true;
   }
-
-  // FUTURE: Extract AuthContext from JWT/session
-  // private extractAuthContext(request: Request): AuthContext | null {
-  //   const token = this.extractTokenFromHeader(request);
-  //   if (!token) return null;
-  //   return this.validateAndDecodeToken(token);
-  // }
 }
 
