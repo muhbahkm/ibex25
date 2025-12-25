@@ -10,7 +10,7 @@ import {
   CustomerSummary,
 } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { useAuth } from '@/auth/useAuth'
+import { RequirePermission } from '@/auth/RequirePermission'
 
 interface DashboardState {
   totalSales: number
@@ -19,7 +19,6 @@ interface DashboardState {
 }
 
 export default function Home() {
-  const { hasPermission } = useAuth()
   const [customers, setCustomers] = useState<CustomerSummary[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
     null,
@@ -273,7 +272,7 @@ export default function Home() {
         )}
 
         {/* Stats Cards - Only visible if user has VIEW_REPORTS permission */}
-        {hasPermission('VIEW_REPORTS') && (
+        <RequirePermission permission="VIEW_REPORTS">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-2">
           {/* إجمالي المبيعات */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -332,7 +331,7 @@ export default function Home() {
             </div>
           </div>
           </div>
-        )}
+        </RequirePermission>
 
         {/* Invoice Table */}
         {statement && (
@@ -400,8 +399,8 @@ export default function Home() {
                           {formatCurrency(invoice.totalAmount)}
                         </td>
                         <td className="px-6 py-4.5 whitespace-nowrap text-center text-sm">
-                          {invoice.status === 'UNPAID' &&
-                            hasPermission('SETTLE_INVOICE') && (
+                          {invoice.status === 'UNPAID' && (
+                            <RequirePermission permission="SETTLE_INVOICE">
                               <button
                                 onClick={() => handleSettleInvoice(invoice.id)}
                                 disabled={
@@ -414,7 +413,8 @@ export default function Home() {
                                   ? 'جاري التسوية...'
                                   : 'تسوية'}
                               </button>
-                            )}
+                            </RequirePermission>
+                          )}
                         </td>
                       </tr>
                     ))}
