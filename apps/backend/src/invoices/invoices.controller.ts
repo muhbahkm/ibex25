@@ -6,14 +6,23 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  UseGuards,
+  Req,
+  BadRequestException,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { InvoicesService } from './invoices.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { OperatorContextDto } from './dto/operator-context.dto';
 import { IssueInvoiceDto } from './dto/issue-invoice.dto';
+import { AuthGuard } from '../auth/auth.guard';
+import { PermissionsGuard, RequirePermissions } from '../auth/permissions.guard';
+import { Permission } from '../auth/permissions.enum';
+import { AuthContext } from '../auth/auth-context.interface';
 
 @Controller('invoices')
+@UseGuards(AuthGuard)
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
 
@@ -80,51 +89,186 @@ export class InvoicesController {
    * - Issue is an atomic transaction
    * - Operator must belong to invoice's store
    *
-   * Requires operatorContext in request body.
+   * Security:
+   * - Requires ISSUE_INVOICE permission
+   * - AuthContext extracted from headers (x-user-id, x-store-id, x-role)
+   * - OperatorContextDto still accepted for backward compatibility
    */
   @Post(':invoiceId/issue')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permission.ISSUE_INVOICE)
   async issue(
     @Param('invoiceId') invoiceId: string,
     @Body() issueDto: IssueInvoiceDto,
+    @Req() request: Request & { auth?: AuthContext },
   ) {
-    return this.invoicesService.issue(invoiceId, issueDto);
+    // Bridge: Extract AuthContext from request (set by AuthGuard)
+    const authContext = request.auth;
+    if (!authContext) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'AUTH_CONTEXT_MISSING',
+          message: 'Authentication context is missing. AuthGuard must be applied.',
+        },
+      });
+    }
+
+    // Bridge: Validate AuthContext matches OperatorContextDto (if provided)
+    // Use AuthContext as source of truth, but validate consistency
+    if (issueDto.operatorId && issueDto.operatorId !== authContext.userId) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'OPERATOR_ID_MISMATCH',
+          message: `Operator ID mismatch. Header x-user-id (${authContext.userId}) does not match body operatorId (${issueDto.operatorId}).`,
+        },
+      });
+    }
+
+    if (issueDto.storeId && issueDto.storeId !== authContext.storeId) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'STORE_ID_MISMATCH',
+          message: `Store ID mismatch. Header x-store-id (${authContext.storeId}) does not match body storeId (${issueDto.storeId}).`,
+        },
+      });
+    }
+
+    // Bridge: Use AuthContext as source of truth, override DTO values
+    const validatedIssueDto: IssueInvoiceDto = {
+      ...issueDto,
+      operatorId: authContext.userId,
+      storeId: authContext.storeId,
+    };
+
+    return this.invoicesService.issue(invoiceId, validatedIssueDto);
   }
 
   /**
    * Settle Invoice
    * POST /invoices/:id/settle
    *
-   * Permission: Store manager only (conceptual - not technical role yet)
-   * Attribution: settledByUserId is recorded
-   *
-   * Requires operatorContext in request body.
+   * Security:
+   * - Requires SETTLE_INVOICE permission
+   * - AuthContext extracted from headers (x-user-id, x-store-id, x-role)
+   * - Attribution: settledByUserId is recorded
+   * - OperatorContextDto still accepted for backward compatibility
    */
   @Post(':invoiceId/settle')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permission.SETTLE_INVOICE)
   async settle(
     @Param('invoiceId') invoiceId: string,
     @Body() operatorContext: OperatorContextDto,
+    @Req() request: Request & { auth?: AuthContext },
   ) {
-    return this.invoicesService.settle(invoiceId, operatorContext);
+    // Bridge: Extract AuthContext from request (set by AuthGuard)
+    const authContext = request.auth;
+    if (!authContext) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'AUTH_CONTEXT_MISSING',
+          message: 'Authentication context is missing. AuthGuard must be applied.',
+        },
+      });
+    }
+
+    // Bridge: Validate AuthContext matches OperatorContextDto (if provided)
+    // Use AuthContext as source of truth, but validate consistency
+    if (operatorContext.operatorId && operatorContext.operatorId !== authContext.userId) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'OPERATOR_ID_MISMATCH',
+          message: `Operator ID mismatch. Header x-user-id (${authContext.userId}) does not match body operatorId (${operatorContext.operatorId}).`,
+        },
+      });
+    }
+
+    if (operatorContext.storeId && operatorContext.storeId !== authContext.storeId) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'STORE_ID_MISMATCH',
+          message: `Store ID mismatch. Header x-store-id (${authContext.storeId}) does not match body storeId (${operatorContext.storeId}).`,
+        },
+      });
+    }
+
+    // Bridge: Use AuthContext as source of truth, override DTO values
+    const validatedOperatorContext: OperatorContextDto = {
+      operatorId: authContext.userId,
+      storeId: authContext.storeId,
+    };
+
+    return this.invoicesService.settle(invoiceId, validatedOperatorContext);
   }
 
   /**
    * Cancel Invoice
    * POST /invoices/:id/cancel
    *
-   * Permission: Store manager only (conceptual - not technical role yet)
-   * Attribution: cancelledByUserId is recorded
-   *
-   * Requires operatorContext in request body.
+   * Security:
+   * - Requires CANCEL_INVOICE permission
+   * - AuthContext extracted from headers (x-user-id, x-store-id, x-role)
+   * - Attribution: cancelledByUserId is recorded
+   * - OperatorContextDto still accepted for backward compatibility
    */
   @Post(':invoiceId/cancel')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permission.CANCEL_INVOICE)
   async cancel(
     @Param('invoiceId') invoiceId: string,
     @Body() operatorContext: OperatorContextDto,
+    @Req() request: Request & { auth?: AuthContext },
   ) {
-    return this.invoicesService.cancel(invoiceId, operatorContext);
+    // Bridge: Extract AuthContext from request (set by AuthGuard)
+    const authContext = request.auth;
+    if (!authContext) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'AUTH_CONTEXT_MISSING',
+          message: 'Authentication context is missing. AuthGuard must be applied.',
+        },
+      });
+    }
+
+    // Bridge: Validate AuthContext matches OperatorContextDto (if provided)
+    // Use AuthContext as source of truth, but validate consistency
+    if (operatorContext.operatorId && operatorContext.operatorId !== authContext.userId) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'OPERATOR_ID_MISMATCH',
+          message: `Operator ID mismatch. Header x-user-id (${authContext.userId}) does not match body operatorId (${operatorContext.operatorId}).`,
+        },
+      });
+    }
+
+    if (operatorContext.storeId && operatorContext.storeId !== authContext.storeId) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'STORE_ID_MISMATCH',
+          message: `Store ID mismatch. Header x-store-id (${authContext.storeId}) does not match body storeId (${operatorContext.storeId}).`,
+        },
+      });
+    }
+
+    // Bridge: Use AuthContext as source of truth, override DTO values
+    const validatedOperatorContext: OperatorContextDto = {
+      operatorId: authContext.userId,
+      storeId: authContext.storeId,
+    };
+
+    return this.invoicesService.cancel(invoiceId, validatedOperatorContext);
   }
 }
 

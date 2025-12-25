@@ -1,7 +1,11 @@
-import { Controller, Get, Query, Res, Header } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Query, Res, UseGuards, Req, BadRequestException } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { LedgerService } from './ledger.service';
 import { LedgerQueryDto } from './dto/ledger-query.dto';
+import { AuthGuard } from '../auth/auth.guard';
+import { PermissionsGuard, RequirePermissions } from '../auth/permissions.guard';
+import { Permission } from '../auth/permissions.enum';
+import { AuthContext } from '../auth/auth-context.interface';
 
 /**
  * Ledger Controller
@@ -10,6 +14,7 @@ import { LedgerQueryDto } from './dto/ledger-query.dto';
  * Ledger entries are append-only financial events (SALE, RECEIPT).
  */
 @Controller('ledger')
+@UseGuards(AuthGuard)
 export class LedgerController {
   constructor(private readonly ledgerService: LedgerService) {}
 
@@ -59,10 +64,58 @@ export class LedgerController {
    * - Content-Disposition: attachment; filename="ledger.csv"
    * - CSV format: Date,Type,Amount
    */
+  /**
+   * Security:
+   * - Requires VIEW_LEDGER permission
+   * - AuthContext extracted from headers (x-user-id, x-store-id, x-role)
+   */
   @Get()
-  async findAll(@Query() query: LedgerQueryDto, @Res() res: Response) {
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permission.VIEW_LEDGER)
+  async findAll(
+    @Query() query: LedgerQueryDto,
+    @Res() res: Response,
+    @Req() request: Request & { auth?: AuthContext },
+  ) {
+    // Bridge: Extract AuthContext from request (set by AuthGuard)
+    const authContext = request.auth;
+    if (!authContext) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'AUTH_CONTEXT_MISSING',
+          message: 'Authentication context is missing. AuthGuard must be applied.',
+        },
+      });
+    }
+
+    // Bridge: Validate AuthContext matches query parameters (if provided)
+    // Use AuthContext as source of truth, but validate consistency
+    if (query.storeId && query.storeId !== authContext.storeId) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'STORE_ID_MISMATCH',
+          message: `Store ID mismatch. Header x-store-id (${authContext.storeId}) does not match query storeId (${query.storeId}).`,
+        },
+      });
+    }
+
+    if (query.operatorId && query.operatorId !== authContext.userId) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'OPERATOR_ID_MISMATCH',
+          message: `Operator ID mismatch. Header x-user-id (${authContext.userId}) does not match query operatorId (${query.operatorId}).`,
+        },
+      });
+    }
+
+    // Bridge: Use AuthContext as source of truth, override query values
+    const validatedStoreId = authContext.storeId;
+
     const entries = await this.ledgerService.findAll(
-      query.storeId,
+      validatedStoreId,
       query.fromDate,
       query.toDate,
     );
