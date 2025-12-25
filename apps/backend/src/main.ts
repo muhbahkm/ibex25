@@ -3,9 +3,13 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { SuccessResponseInterceptor } from './common/interceptors/success-response.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { validateEnvironment } from './core/environment.config';
 
 async function bootstrap() {
   try {
+    // Validate environment variables before starting
+    validateEnvironment();
+    
     const app = await NestFactory.create(AppModule);
     
     // Enable CORS for all origins (for development)
