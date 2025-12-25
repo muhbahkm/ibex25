@@ -10,6 +10,7 @@ import {
   CustomerSummary,
 } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/format'
+import { useAuth } from '@/auth/useAuth'
 
 interface DashboardState {
   totalSales: number
@@ -18,6 +19,7 @@ interface DashboardState {
 }
 
 export default function Home() {
+  const { hasPermission } = useAuth()
   const [customers, setCustomers] = useState<CustomerSummary[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
     null,
@@ -396,20 +398,21 @@ export default function Home() {
                           {formatCurrency(invoice.totalAmount)}
                         </td>
                         <td className="px-6 py-4.5 whitespace-nowrap text-center text-sm">
-                          {invoice.status === 'UNPAID' && (
-                            <button
-                              onClick={() => handleSettleInvoice(invoice.id)}
-                              disabled={
-                                settlingInvoiceId === invoice.id ||
-                                settlingInvoiceId !== null
-                              }
-                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {settlingInvoiceId === invoice.id
-                                ? 'جاري التسوية...'
-                                : 'تسوية'}
-                            </button>
-                          )}
+                          {invoice.status === 'UNPAID' &&
+                            hasPermission('SETTLE_INVOICE') && (
+                              <button
+                                onClick={() => handleSettleInvoice(invoice.id)}
+                                disabled={
+                                  settlingInvoiceId === invoice.id ||
+                                  settlingInvoiceId !== null
+                                }
+                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {settlingInvoiceId === invoice.id
+                                  ? 'جاري التسوية...'
+                                  : 'تسوية'}
+                              </button>
+                            )}
                         </td>
                       </tr>
                     ))}
