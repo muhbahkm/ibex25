@@ -5,7 +5,10 @@ import { Prisma, InvoiceStatus } from '@prisma/client';
 
 @Injectable()
 export class InvoicesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditService: AuditService,
+  ) {}
 
   async create(createInvoiceDto: CreateInvoiceDto) {
     const { storeId, createdBy, customerId, items } = createInvoiceDto;
