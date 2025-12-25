@@ -1,6 +1,7 @@
 import { Controller, Get, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { Request } from 'express';
 import { SubscriptionsService } from './subscriptions.service';
+import { PricingService } from './pricing.service';
 import { UsageResolver } from './usage/usage-resolver';
 import { StorePlanDto } from './dto/store-plan.dto';
 import { StoreScopeGuard } from '../core/store-scope.guard';
@@ -10,15 +11,17 @@ import { PrismaService } from '../prisma.service';
  * Billing Controller
  *
  * B1: Read-only API for billing and plans.
- * Returns plan information, limits, features, and current usage.
+ * B2: Extended with pricing endpoint.
+ * Returns plan information, limits, features, usage, and pricing.
  *
- * ⚠️ FOUNDATION ONLY: No payments, no billing cycles.
+ * ⚠️ FOUNDATION ONLY: No payments, no charging, no enforcement of expirations.
  */
 @UseGuards(StoreScopeGuard)
 @Controller('billing')
 export class BillingController {
   constructor(
     private subscriptionsService: SubscriptionsService,
+    private pricingService: PricingService,
     private prisma: PrismaService,
   ) {}
 
@@ -65,6 +68,55 @@ export class BillingController {
     return {
       success: true,
       data: response,
+    };
+  }
+
+  /**
+   * Get Store Pricing
+   * GET /billing/pricing
+   *
+   * B2: Returns available pricing options for the store's current plan.
+   * This is read-only - no mutations, no charging, no side effects.
+   *
+   * Response:
+   * {
+   *   "success": true,
+   *   "data": {
+   *     "plan": "PRO",
+   *     "pricing": [
+   *       { "cycle": "MONTHLY", "priceCents": 2900, "currency": "USD" },
+   *       { "cycle": "YEARLY", "priceCents": 29900, "currency": "USD" }
+   *     ]
+   *   }
+   * }
+   */
+  @Get('pricing')
+  async getPricing(@Req() req: Request): Promise<{
+    success: true;
+    data: {
+      plan: string;
+      pricing: Array<{
+        cycle: string;
+        priceCents: number;
+        currency: string;
+      }>;
+    };
+  }> {
+    const storeId = req['storeId'] as string;
+
+    if (!storeId) {
+      throw new ForbiddenException('Store ID is required');
+    }
+
+    // Get pricing for store's current subscription
+    const pricingData = await this.pricingService.getPricingForStore(storeId);
+
+    return {
+      success: true,
+      data: {
+        plan: pricingData.plan.code,
+        pricing: pricingData.pricing,
+      },
     };
   }
 }

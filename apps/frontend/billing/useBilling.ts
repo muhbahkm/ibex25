@@ -1,32 +1,39 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { fetchStorePlan, StorePlan } from '@/lib/api'
+import { fetchStorePlan, fetchStorePricing, StorePlan, StorePricing } from '@/lib/api'
 
 /**
  * useBilling Hook
  *
  * B1: Fetches and exposes billing plan information for the current store.
+ * B2: Extended with pricing information.
  * This is read-only - no mutations, no payments, no billing logic.
  */
 export function useBilling() {
   const [plan, setPlan] = useState<StorePlan | null>(null)
+  const [pricing, setPricing] = useState<StorePricing | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let isMounted = true
 
-    async function loadPlan() {
+    async function loadBilling() {
       try {
         setLoading(true)
         setError(null)
 
-        const planData = await fetchStorePlan()
+        // Load plan and pricing in parallel
+        const [planData, pricingData] = await Promise.all([
+          fetchStorePlan(),
+          fetchStorePricing(),
+        ])
 
         if (!isMounted) return
 
         setPlan(planData)
+        setPricing(pricingData)
       } catch (err) {
         if (!isMounted) return
 
@@ -39,7 +46,7 @@ export function useBilling() {
       }
     }
 
-    loadPlan()
+    loadBilling()
 
     return () => {
       isMounted = false
@@ -48,6 +55,7 @@ export function useBilling() {
 
   return {
     plan,
+    pricing,
     loading,
     error,
   }

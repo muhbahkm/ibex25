@@ -158,6 +158,32 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// Plan Model - B1: Subscription plan definitions (B2: Extended with pricing relation)
+model Plan {
+  id          String              @id @default(uuid())
+  code        String              @unique
+  name        String
+  description String?
+  limits      Json                // e.g. { invoicesPerMonth: 500, users: 3 }
+  features    Json                // e.g. { ledger: true, reports: true }
+  createdAt   DateTime            @default(now())
+  subscriptions StoreSubscription[]
+  pricing     PlanPricing[]
+
+  @@map("plans")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+// BillingCycle Enum - B2: Defines billing cycle options (MONTHLY, YEARLY)
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
 // Plan Model - B1: Subscription plan definitions (FOUNDATION ONLY: No pricing, no billing cycles)
 model Plan {
   id          String              @id @default(uuid())
@@ -168,13 +194,23 @@ model Plan {
   features    Json                // e.g. { ledger: true, reports: true }
   createdAt   DateTime            @default(now())
   subscriptions StoreSubscription[]
+  pricing     PlanPricing[]
 
   @@map("plans")
 }
 
-enum SubscriptionStatus {
-  ACTIVE
-  SUSPENDED
+// PlanPricing Model - B2: Pricing definitions for plans (READ-ONLY, no enforcement)
+model PlanPricing {
+  id          String        @id @default(uuid())
+  planId      String
+  billingCycle BillingCycle
+  priceCents  Int           // Price in cents (no decimals)
+  currency    String        // e.g. "USD"
+  createdAt   DateTime      @default(now())
+  plan        Plan          @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, billingCycle])
+  @@map("plan_pricing")
 }
 
 // Store Subscription Model - B1: Links Store to Plan (FOUNDATION ONLY: No billing cycles, no expiration)

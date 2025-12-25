@@ -9,7 +9,7 @@ import {
   CustomerStatement,
   CustomerSummary,
 } from '@/lib/api'
-import { formatCurrency, formatDate } from '@/lib/format'
+import { formatCurrency, formatDate, formatPriceFromCents, formatBillingCycle } from '@/lib/format'
 import { RequirePermission } from '@/auth/RequirePermission'
 import { useBilling } from '@/billing/useBilling'
 
@@ -34,7 +34,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   
   // B1: Fetch billing plan information
-  const { plan: billingPlan, loading: loadingPlan } = useBilling()
+  // B2: Extended with pricing information
+  const { plan: billingPlan, pricing: billingPricing, loading: loadingPlan } = useBilling()
 
   useEffect(() => {
     let isMounted = true

@@ -390,7 +390,7 @@ This logging includes:
 ---
 
 **Last Updated:** 2025-12-25  
-**Phase:** B1 - Billing & Plans (Foundation Only)
+**Phase:** B2 - Pricing & Billing Cycles (Read-Only)
 
 ---
 
@@ -474,10 +474,10 @@ Usage is computed **dynamically** from existing data:
 
 ### Future Phases
 
-- **B2**: Payment integration (Stripe)
 - **B3**: Billing cycles and invoicing
-- **B4**: Auto-upgrades / downgrades
-- **B5**: Usage-based billing
+- **B4**: Payment integration (Stripe)
+- **B5**: Auto-upgrades / downgrades
+- **B6**: Usage-based billing
 
 ### Contract Safety
 
@@ -487,4 +487,79 @@ B1 respects all frozen contracts:
 - ✅ No API contract changes
 - ✅ No multi-tenant isolation breaks
 - ✅ No accounting logic modifications
+
+---
+
+## Pricing & Billing Cycles (B2)
+
+### Overview
+
+Phase B2 extends the billing domain with pricing definitions and billing cycles. **This is still descriptive only** - no charging, no billing enforcement, no expiration logic.
+
+### What B2 Provides
+
+- **BillingCycle Enum**: MONTHLY, YEARLY
+- **PlanPricing Model**: Links plans to pricing with billing cycles
+- **PricingService**: Read-only service for fetching pricing information
+- **GET /billing/pricing**: Read-only endpoint to fetch store's plan pricing
+- **Frontend Pricing Display**: Minimal UI to show available pricing options
+
+### What B2 Does NOT Provide
+
+- ❌ Charging customers
+- ❌ Creating invoices for subscriptions
+- ❌ Enforcing expirations
+- ❌ Billing cycle enforcement
+- ❌ Time-based logic
+- ❌ Stripe or any payment gateway
+
+### Architecture
+
+**Database Models:**
+- `BillingCycle`: Enum (MONTHLY, YEARLY)
+- `PlanPricing`: Pricing definitions with planId, billingCycle, priceCents, currency
+
+**Backend Services:**
+- `PricingService`: Read-only pricing operations
+  - `getPricingByPlanId()`: Get all pricing options for a plan
+  - `getPricingByPlanAndCycle()`: Get specific pricing
+  - `getPricingForStore()`: Get pricing for store's current subscription
+
+**API Endpoints:**
+- `GET /billing/pricing`: Returns available pricing for store's current plan
+
+**Frontend:**
+- Extended `useBilling` hook with pricing data
+- Minimal pricing display in dashboard (read-only)
+
+### Why This is Not Billing Yet
+
+B2 is **descriptive only**:
+- Pricing definitions exist but are not enforced
+- No billing cycles are tracked or enforced
+- No expiration dates
+- No charging logic
+- No payment processing
+
+This phase adds pricing information to the system without implementing any billing or charging logic.
+
+### Pricing vs Billing vs Charging
+
+**Pricing (B2)**: Definition of prices for plans and billing cycles. Read-only, descriptive.
+
+**Billing (Future)**: The process of creating invoices for subscriptions, tracking billing cycles, managing renewals.
+
+**Charging (Future)**: The actual payment processing (Stripe, PayPal, etc.) that charges customers.
+
+**Current State**: We have pricing definitions only. Billing and charging are not implemented.
+
+### Contract Safety
+
+B2 respects all frozen contracts:
+- ✅ No invoice lifecycle changes
+- ✅ No ledger invariant changes
+- ✅ No existing API contract changes (only new read-only endpoint)
+- ✅ No multi-tenant isolation breaks
+- ✅ No accounting logic modifications
+- ✅ No writes to accounting tables
 

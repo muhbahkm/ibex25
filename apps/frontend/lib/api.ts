@@ -272,3 +272,48 @@ export async function fetchStorePlan(): Promise<StorePlan> {
 
   return body.data
 }
+
+// B2: Pricing API
+export interface StorePricing {
+  plan: string
+  pricing: Array<{
+    cycle: 'MONTHLY' | 'YEARLY'
+    priceCents: number
+    currency: string
+  }>
+}
+
+interface PricingResponse {
+  success: boolean
+  data?: StorePricing
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchStorePricing(): Promise<StorePricing> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/billing/pricing`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    throw new Error('تعذر جلب معلومات الأسعار من الخادم.')
+  }
+
+  const body = (await res.json()) as PricingResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب معلومات الأسعار.'
+    throw new Error(message)
+  }
+
+  return body.data
+}

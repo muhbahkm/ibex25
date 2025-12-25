@@ -15,4 +15,20 @@ export function formatDate(value: string | Date): string {
   })
 }
 
+// B2: Format price from cents
+export function formatPriceFromCents(priceCents: number, currency: string = 'USD'): string {
+  const amount = priceCents / 100
+  return new Intl.NumberFormat('ar-EG', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+// B2: Format billing cycle label
+export function formatBillingCycle(cycle: 'MONTHLY' | 'YEARLY'): string {
+  return cycle === 'MONTHLY' ? 'شهري' : 'سنوي'
+}
+
 
