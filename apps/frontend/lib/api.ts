@@ -213,3 +213,57 @@ export async function fetchLedgerEntries(
 
   return body.data
 }
+
+export interface ProfitLossReport {
+  totalSales: number
+  totalReceipts: number
+  netRevenue: number
+}
+
+interface ProfitLossResponse {
+  success: boolean
+  data?: ProfitLossReport
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchProfitLoss(
+  fromDate?: string,
+  toDate?: string,
+): Promise<ProfitLossReport> {
+  const baseUrl = getApiBaseUrl()
+  const params = new URLSearchParams()
+
+  if (fromDate) {
+    params.append('fromDate', fromDate)
+  }
+
+  if (toDate) {
+    params.append('toDate', toDate)
+  }
+
+  const url = `${baseUrl}/reports/profit-loss${params.toString() ? `?${params.toString()}` : ''}`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    throw new Error('تعذر جلب تقرير الربح والخسارة من الخادم.')
+  }
+
+  const body = (await res.json()) as ProfitLossResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب تقرير الربح والخسارة.'
+    throw new Error(message)
+  }
+
+  return body.data
+}

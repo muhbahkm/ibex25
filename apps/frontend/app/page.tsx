@@ -6,8 +6,10 @@ import {
   fetchCustomers,
   fetchCustomerStatement,
   settleInvoice,
+  fetchProfitLoss,
   CustomerStatement,
   CustomerSummary,
+  ProfitLossReport,
 } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { RequirePermission } from '@/auth/RequirePermission'
@@ -25,8 +27,10 @@ export default function Home() {
   )
   const [statement, setStatement] = useState<CustomerStatement | null>(null)
   const [data, setData] = useState<DashboardState | null>(null)
+  const [profitLoss, setProfitLoss] = useState<ProfitLossReport | null>(null)
   const [loadingCustomers, setLoadingCustomers] = useState<boolean>(true)
   const [loadingStatement, setLoadingStatement] = useState<boolean>(false)
+  const [loadingProfitLoss, setLoadingProfitLoss] = useState<boolean>(true)
   const [settlingInvoiceId, setSettlingInvoiceId] = useState<string | null>(
     null,
   )
@@ -105,19 +109,61 @@ export default function Home() {
     }
   }, [])
 
+  // Load profit-loss report (derived from ledger)
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadProfitLoss() {
+      try {
+        setLoadingProfitLoss(true)
+        setError(null)
+
+        const profitLossData = await fetchProfitLoss()
+
+        if (!isMounted) return
+
+        setProfitLoss(profitLossData)
+      } catch (err) {
+        if (!isMounted) return
+        // Don't set error for profit-loss (non-critical)
+        console.error('Failed to load profit-loss:', err)
+      } finally {
+        if (isMounted) {
+          setLoadingProfitLoss(false)
+        }
+      }
+    }
+
+    loadProfitLoss()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   const formatInteger = (value: number) =>
     value.toLocaleString('ar-EG', {
       maximumFractionDigits: 0,
     })
 
   const isLoading = loadingCustomers || loadingStatement
+  const isLoadingReports = loadingProfitLoss
 
+  // Use profit-loss data for stats cards (derived from ledger)
   const totalSalesDisplay =
-    data && !isLoading ? formatCurrency(data.totalSales) : '...'
+    profitLoss && !isLoadingReports
+      ? formatCurrency(profitLoss.totalSales)
+      : '...'
   const outstandingBalanceDisplay =
     data && !isLoading ? formatCurrency(data.outstandingBalance) : '...'
   const invoicesCountDisplay =
     data && !isLoading ? formatInteger(data.invoicesCount) : '...'
+  
+  // Net revenue from profit-loss (can be used for additional card if needed)
+  const netRevenueDisplay =
+    profitLoss && !isLoadingReports
+      ? formatCurrency(profitLoss.netRevenue)
+      : '...'
 
   const handleCustomerChange = async (
     event: React.ChangeEvent<HTMLSelectElement>,
@@ -282,7 +328,7 @@ export default function Home() {
                 <p className="text-2xl font-bold text-gray-900 mt-2">
                   {totalSalesDisplay}
                 </p>
-                {isLoading && (
+                {(isLoading || isLoadingReports) && (
                   <p className="mt-1 text-xs text-gray-400">جاري تحميل البيانات...</p>
                 )}
               </div>
