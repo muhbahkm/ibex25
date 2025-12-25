@@ -8,14 +8,15 @@ datasource db {
 }
 
 model Store {
-  id        String     @id @default(uuid())
-  name      String
-  createdAt DateTime   @default(now())
-  customers Customer[]
-  invoices  Invoice[]
-  products  Product[]
-  users     User[]
-  payments  Payment[]
+  id            String         @id @default(uuid())
+  name          String
+  createdAt     DateTime       @default(now())
+  customers     Customer[]
+  invoices      Invoice[]
+  products      Product[]
+  users         User[]
+  payments      Payment[]
+  ledgerEntries LedgerEntry[]
 
   @@map("stores")
 }
@@ -60,26 +61,27 @@ model Product {
 }
 
 model Invoice {
-  id               String        @id @default(uuid())
+  id               String         @id @default(uuid())
   storeId          String
   customerId       String?
   status           InvoiceStatus @default(DRAFT)
-  totalAmount      Decimal       @db.Decimal(10, 2)
+  totalAmount      Decimal        @db.Decimal(10, 2)
   paymentType      PaymentType?
   createdBy        String
   createdAt        DateTime      @default(now())
   items            InvoiceItem[]
   payment          Payment?
-  creator          User          @relation("CreatedBy", fields: [createdBy], references: [id])
-  customer         Customer?     @relation(fields: [customerId], references: [id])
-  store            Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  ledgerEntries    LedgerEntry[]
+  creator          User           @relation("CreatedBy", fields: [createdBy], references: [id])
+  customer         Customer?      @relation(fields: [customerId], references: [id])
+  store            Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
   // Attribution fields - track who performed critical operations
   issuedByUserId   String?
   settledByUserId  String?
   cancelledByUserId String?
-  issuedBy         User?         @relation("IssuedBy", fields: [issuedByUserId], references: [id])
-  settledBy        User?         @relation("SettledBy", fields: [settledByUserId], references: [id])
-  cancelledBy      User?         @relation("CancelledBy", fields: [cancelledByUserId], references: [id])
+  issuedBy         User?          @relation("IssuedBy", fields: [issuedByUserId], references: [id])
+  settledBy        User?          @relation("SettledBy", fields: [settledByUserId], references: [id])
+  cancelledBy      User?          @relation("CancelledBy", fields: [cancelledByUserId], references: [id])
 
   @@map("invoices")
 }
@@ -120,4 +122,22 @@ enum InvoiceStatus {
 enum PaymentType {
   CASH
   CREDIT
+}
+
+enum LedgerEntryType {
+  SALE
+  RECEIPT
+}
+
+model LedgerEntry {
+  id        String           @id @default(uuid())
+  storeId   String
+  invoiceId String
+  type      LedgerEntryType
+  amount    Decimal          @db.Decimal(10, 2)
+  createdAt DateTime         @default(now())
+  store     Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  invoice   Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("ledger_entries")
 }
