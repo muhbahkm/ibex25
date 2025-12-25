@@ -1,161 +1,165 @@
-# Authentication & Authorization Skeleton
+# Authentication & Authorization
 
-## Overview
+This module provides authentication and authorization infrastructure for IBEX.
 
-This directory contains the authentication and authorization scaffolding for IBEX.
-**This is NOT a working authentication system yet.** It is a skeleton designed to prevent architectural drift and enable clean integration of real authentication in the future.
+## Current Implementation (Phase J)
 
-## Current State
+### Header-Based Authentication (Temporary)
 
-### What Exists
+Authentication is currently implemented using explicit headers. This is a temporary solution before JWT is introduced.
 
-- **OperatorContext**: Explicitly passed in every financial operation
-- **Store Ownership Guard**: Validates operator belongs to invoice's store
-- **No Real Auth**: No JWT, no sessions, no login system
+**Required Headers:**
+- `x-user-id`: UUID of the authenticated user
+- `x-store-id`: UUID of the store the user belongs to
+- `x-role`: User's role (OWNER | MANAGER | CASHIER | AUDITOR)
 
-### What This Skeleton Provides
+**Validation:**
+- All headers are required for protected routes
+- Headers are validated strictly (UUID format, valid role enum)
+- Missing or invalid headers result in 401 Unauthorized
 
-- **Role Definitions**: OWNER, MANAGER, CASHIER, AUDITOR
-- **Permission Definitions**: Granular permissions for operations
-- **AuthContext Interface**: Core contract for authenticated users
-- **Auth Guard Stub**: Placeholder guard (not enforced yet)
+### AuthGuard
+
+The `AuthGuard` extracts authentication information from headers and builds an `AuthContext`:
+
+1. Reads `x-user-id`, `x-store-id`, and `x-role` headers
+2. Validates header format and values
+3. Builds `AuthContext` with role-derived permissions
+4. Attaches `AuthContext` to `request.auth`
+5. Throws 401 Unauthorized if headers are missing or invalid
+
+**Error Codes:**
+- `AUTH_HEADERS_MISSING`: Required headers are missing
+- `AUTH_INVALID_USER_ID`: User ID is not a valid UUID
+- `AUTH_INVALID_STORE_ID`: Store ID is not a valid UUID
+- `AUTH_INVALID_ROLE`: Role is not a valid enum value
+
+### PermissionsGuard
+
+The `PermissionsGuard` enforces permission-based access control:
+
+1. Reads required permissions from route metadata (via `@RequirePermissions` decorator)
+2. Checks if user's permissions include all required permissions
+3. Throws 403 Forbidden if permission is missing
+4. Allows access if all permissions are present
+
+**Error Codes:**
+- `AUTH_CONTEXT_MISSING`: AuthGuard was not applied or failed
+- `PERMISSION_DENIED`: User lacks required permission(s)
+
+### Role → Permission Mapping
+
+Permissions are **always** derived from role using `getPermissionsForRole()`. This mapping is the single source of truth and must match the frontend mapping.
+
+**Role Permissions:**
+- **OWNER**: All permissions (ISSUE_INVOICE, SETTLE_INVOICE, CANCEL_INVOICE, VIEW_LEDGER, VIEW_REPORTS)
+- **MANAGER**: Invoice operations + view operations (ISSUE_INVOICE, SETTLE_INVOICE, CANCEL_INVOICE, VIEW_LEDGER, VIEW_REPORTS)
+- **CASHIER**: Issue invoices + view ledger (ISSUE_INVOICE, VIEW_LEDGER)
+- **AUDITOR**: View operations only (VIEW_LEDGER, VIEW_REPORTS)
+
+### Protected Endpoints
+
+The following endpoints require authentication and specific permissions:
+
+**Invoices:**
+- `POST /invoices/:id/issue` → Requires `ISSUE_INVOICE`
+- `POST /invoices/:id/settle` → Requires `SETTLE_INVOICE`
+- `POST /invoices/:id/cancel` → Requires `CANCEL_INVOICE`
+
+**Ledger:**
+- `GET /ledger` → Requires `VIEW_LEDGER`
+
+### OperatorContext Bridge
+
+For backward compatibility, `OperatorContextDto` is still accepted in request bodies. However, `AuthContext` (from headers) is the source of truth:
+
+1. Controllers extract `AuthContext` from `request.auth` (set by `AuthGuard`)
+2. Controllers validate that `AuthContext` matches `OperatorContextDto` (if provided)
+3. Controllers use `AuthContext` as source of truth, overriding DTO values
+4. Services receive validated `OperatorContextDto` derived from `AuthContext`
+
+**Validation:**
+- If `OperatorContextDto` is provided, it must match `AuthContext`
+- Mismatches result in 400 Bad Request with error codes:
+  - `OPERATOR_ID_MISMATCH`: Header `x-user-id` does not match body `operatorId`
+  - `STORE_ID_MISMATCH`: Header `x-store-id` does not match body `storeId`
+
+## Migration Path to JWT
+
+### Phase 1 (Current): Header-Based Auth
+- Explicit headers (`x-user-id`, `x-store-id`, `x-role`)
+- Temporary solution for development
+- Easy to test and debug
+
+### Phase 2 (Future): JWT-Based Auth
+- JWT token in `Authorization: Bearer <token>` header
+- Token contains `AuthContext` in payload
+- Token signature validation
+- Token expiration handling
+
+### Phase 3 (Future): Session-Based Auth (Optional)
+- Server-side sessions
+- Cookie-based authentication
+- Session management
+
+## Why JWT is Deferred
+
+JWT implementation is deferred to allow:
+1. **Rapid development**: Header-based auth is faster to implement and test
+2. **Clear separation**: Authentication logic is isolated and can be swapped
+3. **Incremental hardening**: Security can be improved without breaking changes
+4. **Testing simplicity**: Headers are easier to mock in tests
 
 ## Architecture Principles
 
-### Auth Wraps, Doesn't Invade
+1. **Single Source of Truth**: Permissions are always derived from role
+2. **Explicit Over Implicit**: Headers are explicit, not inferred
+3. **Fail Secure**: Missing auth = 401, missing permission = 403
+4. **Backward Compatible**: OperatorContextDto still works during migration
+5. **No Breaking Changes**: API contracts remain unchanged
 
-Authentication must wrap the system, not invade it. The invoice lifecycle, ledger, and business logic remain sovereign.
+## Usage Examples
 
-### Parallel, Not Invasive
+### Protecting an Endpoint
 
-This skeleton exists **parallel** to OperatorContext, not as a replacement. Migration will happen gradually.
-
-### Explicit Over Implicit
-
-OperatorContext is passed explicitly, which is excellent. Future AuthContext will be extracted from JWT but will maintain the same explicit contract.
-
-## Files
-
-### `roles.enum.ts`
-
-Defines organizational roles:
-- **OWNER**: Full system control
-- **MANAGER**: Store operations management
-- **CASHIER**: Point-of-sale operations
-- **AUDITOR**: Read-only access
-
-### `permissions.enum.ts`
-
-Defines granular permissions:
-- **ISSUE_INVOICE**: Create and issue invoices
-- **SETTLE_INVOICE**: Settle unpaid invoices
-- **CANCEL_INVOICE**: Cancel invoices
-- **VIEW_LEDGER**: View ledger entries
-- **VIEW_REPORTS**: View financial reports
-
-### `auth-context.interface.ts`
-
-Core contract for authenticated users:
 ```typescript
-interface AuthContext {
-  userId: string;
-  storeId: string;
-  role: Role;
-  permissions: Permission[];
-}
-```
-
-### `auth.guard.ts`
-
-Placeholder guard that:
-- Currently: Always allows (no enforcement)
-- Future: Will extract AuthContext from JWT
-- Future: Will enforce permissions
-- Future: Will attach AuthContext to request
-
-## Why Auth Is Not Enforced Yet
-
-1. **Frontend Not Ready**: No login UI, no session management
-2. **Backend Not Ready**: No JWT generation, no user management
-3. **OperatorContext Works**: Explicit passing is clear and safe
-4. **No Pressure**: System works correctly without auth enforcement
-
-## Migration Path
-
-### Phase 1: Current (Explicit OperatorContext)
-```typescript
-async issue(invoiceId: string, operatorContext: OperatorContextDto) {
-  // OperatorContext passed explicitly
-}
-```
-
-### Phase 2: Future (AuthContext from JWT)
-```typescript
+@Controller('resource')
 @UseGuards(AuthGuard)
-async issue(@Request() req, invoiceId: string) {
-  const authContext: AuthContext = req.authContext;
-  // AuthContext extracted from JWT
+export class ResourceController {
+  @Post()
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permission.CREATE_RESOURCE)
+  async create(@Req() request: Request & { auth?: AuthContext }) {
+    const authContext = request.auth!; // Guaranteed by guards
+    // Use authContext.userId, authContext.storeId, etc.
+  }
 }
 ```
 
-### Phase 3: Future (OperatorContext Derived)
+### Accessing AuthContext in Controller
+
 ```typescript
-const operatorContext = {
-  operatorId: authContext.userId,
-  storeId: authContext.storeId,
-};
+@Post(':id/action')
+@UseGuards(AuthGuard, PermissionsGuard)
+@RequirePermissions(Permission.ACTION)
+async action(
+  @Param('id') id: string,
+  @Req() request: Request & { auth?: AuthContext },
+) {
+  const authContext = request.auth!;
+  // Bridge to OperatorContextDto if needed
+  const operatorContext: OperatorContextDto = {
+    operatorId: authContext.userId,
+    storeId: authContext.storeId,
+  };
+  return this.service.action(id, operatorContext);
+}
 ```
 
-## Integration Points
+## Security Notes
 
-### With User Model
-
-Future integration with Prisma User model:
-- User.role field will map to AuthContext.role
-- User.storeId will map to AuthContext.storeId
-- User.id will map to AuthContext.userId
-
-### With Permissions
-
-Future permission enforcement:
-- Role-based: OWNER can do everything
-- Permission-based: Check permissions array
-- Store-based: Already enforced by StoreOwnershipGuard
-
-### With Frontend
-
-Future frontend integration:
-- Login endpoint will generate JWT
-- JWT will contain AuthContext
-- Frontend will send JWT in Authorization header
-- Backend will extract and validate JWT
-
-## Why This Matters
-
-1. **Prevents Auth Chaos**: Clear structure prevents ad-hoc auth implementation
-2. **Avoids Refactors**: Future auth can integrate cleanly
-3. **Convergence Path**: Frontend and backend auth can converge cleanly
-4. **Sovereign Logic**: Accounting logic remains independent of auth
-
-## Future Work
-
-1. **JWT Implementation**: Generate and validate JWTs
-2. **User Management**: Create, update, delete users
-3. **Role Assignment**: Assign roles to users
-4. **Permission Mapping**: Map roles to permissions
-5. **Guard Enforcement**: Enable AuthGuard enforcement
-6. **Frontend Integration**: Login UI, session management
-
-## Important Notes
-
-- **DO NOT** enforce permissions yet
-- **DO NOT** block endpoints yet
-- **DO NOT** parse headers yet
-- **DO** maintain explicit OperatorContext passing
-- **DO** document future integration points
-- **DO** keep business logic sovereign
-
----
-
-**This skeleton exists to prevent architectural drift, not to enforce security yet.**
-
+- **Never trust client input**: Always validate headers and DTOs
+- **Always validate consistency**: AuthContext must match OperatorContextDto if provided
+- **Use AuthContext as source of truth**: Headers override body/query parameters
+- **Fail secure**: Missing auth = deny, missing permission = deny
+- **No partial enforcement**: All-or-nothing per endpoint
