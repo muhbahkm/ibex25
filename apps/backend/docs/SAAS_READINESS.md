@@ -271,11 +271,90 @@ Tenant isolation enforcement is being rolled out in a controlled, staged manner 
 3. **Gradual Migration**: Gives time to validate behavior and fix edge cases
 4. **Business Continuity**: Critical operations (invoices) remain unchanged during validation
 
+**Phase S3 (Invoice Domain Hardening):**
+- `StoreScopeGuard` applied to `InvoicesController`
+- Service-layer enforcement added to `InvoicesService` (defense in depth)
+- Cross-tenant access logging with request correlation
+- **Dual validation strategy**: Guard + Service layer (security feature, not redundancy)
+
+**Why Dual Validation?**
+The dual validation (guard + service) is a security feature, not redundancy:
+- **Guard**: Prevents unauthorized requests from reaching the service layer
+- **Service**: Validates ownership even if guard is bypassed or service is called directly
+- **Defense in Depth**: Multiple layers of protection ensure tenant isolation
+
 **Future Phases:**
-- **S3:** Apply `StoreScopeGuard` to remaining controllers (Invoices, Customers, etc.)
-- **S4:** Implement authentication system with JWT
-- **S5:** Remove `operatorContext` from request bodies
-- **S6:** Add tenant-level configuration
+- **S4:** Apply `StoreScopeGuard` to remaining controllers (Customers, etc.)
+- **S5:** Implement authentication system with JWT
+- **S6:** Remove `operatorContext` from request bodies
+- **S7:** Add tenant-level configuration
+
+---
+
+## Invoice Domain Hardening (S3)
+
+### Overview
+
+Phase S3 hardens the Invoice domain with explicit tenant isolation enforcement at both the controller and service layers. This provides defense-in-depth security for the most critical financial operations.
+
+### Dual Validation Strategy
+
+**Controller Level (`StoreScopeGuard`):**
+- Applied to `InvoicesController` at the class level
+- Validates `storeId` from request context before request reaches service
+- Prevents unauthorized requests from entering the service layer
+- Returns `403 Forbidden` with `CROSS_TENANT_ACCESS_DENIED` error code
+
+**Service Level (`InvoicesService.enforceStoreOwnership`):**
+- Validates `invoice.storeId === operatorStoreId` in all critical methods:
+  - `issue()` - Invoice issuance
+  - `settle()` - Invoice settlement
+  - `cancel()` - Invoice cancellation
+  - `updateDraft()` - Draft invoice updates
+- Validates ownership even if guard is bypassed
+- Logs blocked attempts with request correlation ID
+- Returns `403 Forbidden` with `INVOICE_CROSS_TENANT_ACCESS` error code
+
+### Why Dual Validation is Not Redundancy
+
+The dual validation (guard + service) is a **security feature**, not redundancy:
+
+1. **Guard Protection**: Prevents unauthorized requests from reaching the service layer, reducing load and providing early rejection
+2. **Service Protection**: Validates ownership even if:
+   - Guard is bypassed (e.g., direct service calls)
+   - Guard logic has bugs
+   - Service is called from background jobs or internal processes
+3. **Defense in Depth**: Multiple layers of protection ensure tenant isolation even if one layer fails
+4. **Audit Trail**: Service-layer validation provides detailed logging with request correlation IDs
+
+### Logging
+
+When a cross-tenant access attempt is blocked at the service layer:
+
+```
+[requestId] INVOICE_CROSS_TENANT_ACCESS: invoiceId=<id>, operatorStoreId=<id>, invoiceStoreId=<id>, operation=<operation>
+```
+
+This logging includes:
+- `requestId`: Request correlation ID for tracing
+- `invoiceId`: The invoice being accessed
+- `operatorStoreId`: The store ID of the operator
+- `invoiceStoreId`: The store ID of the invoice
+- `operation`: The operation being attempted (issue, settle, cancel, updateDraft)
+
+### Implementation Details
+
+**Service Layer Enforcement:**
+- `InvoicesService` uses `REQUEST` scope to access request context
+- `enforceStoreOwnership()` method validates store ownership
+- Request correlation ID extracted from request context for logging
+- Error code: `INVOICE_CROSS_TENANT_ACCESS`
+
+**No Behavioral Changes:**
+- Invoice lifecycle remains identical
+- State transitions unchanged
+- Ledger, Payment, Audit behavior untouched
+- All existing invariants preserved
 
 ---
 
@@ -311,5 +390,5 @@ Tenant isolation enforcement is being rolled out in a controlled, staged manner 
 ---
 
 **Last Updated:** 2025-12-25  
-**Phase:** S2 - SaaS Enforcement (Controlled)
+**Phase:** S3 - Invoice Domain Hardening
 

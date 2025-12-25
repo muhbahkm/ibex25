@@ -3,7 +3,12 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
+  Inject,
+  Scope,
 } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
 import { PrismaService } from '../prisma.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
@@ -14,9 +19,51 @@ import { InvoiceStateTransitions } from './utils/invoice-state-transitions';
 import { StoreOwnershipGuard } from './utils/store-ownership.guard';
 import { LedgerGuard } from './utils/ledger-guard';
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class InvoicesService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(InvoicesService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    @Inject(REQUEST) private request: Request,
+  ) {}
+
+  /**
+   * S3: Enforce Store Ownership with Logging
+   *
+   * This method provides defense-in-depth by validating store ownership
+   * at the service layer, even though StoreScopeGuard already validates
+   * at the controller level.
+   *
+   * The dual validation (guard + service) is a security feature, not redundancy:
+   * - Guard: Prevents unauthorized requests from reaching the service
+   * - Service: Validates ownership even if guard is bypassed or service is called directly
+   *
+   * @param invoiceStoreId - The storeId of the invoice
+   * @param operatorStoreId - The storeId from AuthContext (or operatorContext)
+   * @param operation - Description of the operation being performed
+   * @param invoiceId - The invoice ID (for logging)
+   */
+  private enforceStoreOwnership(
+    invoiceStoreId: string,
+    operatorStoreId: string,
+    operation: string,
+    invoiceId: string,
+  ): void {
+    if (invoiceStoreId !== operatorStoreId) {
+      const requestId = (this.request?.['requestId'] as string) || 'unknown';
+      this.logger.warn(
+        `[${requestId}] INVOICE_CROSS_TENANT_ACCESS: invoiceId=${invoiceId}, ` +
+          `operatorStoreId=${operatorStoreId}, invoiceStoreId=${invoiceStoreId}, operation=${operation}`,
+      );
+
+      throw new ForbiddenException({
+        message: `Operation '${operation}' on invoice ${invoiceId} is forbidden. ` +
+          `Cross-tenant access denied. Operator storeId=${operatorStoreId}, Invoice storeId=${invoiceStoreId}.`,
+        code: 'INVOICE_CROSS_TENANT_ACCESS',
+      });
+    }
+  }
 
   async create(
     createInvoiceDto: CreateInvoiceDto,
@@ -188,8 +235,9 @@ export class InvoicesService {
       throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
     }
 
-    // Store Ownership Guard: Validate operator belongs to invoice's store
-    StoreOwnershipGuard.validateStoreOwnership(
+    // S3: Enforce store ownership at service layer (defense in depth)
+    // This validation runs even if StoreScopeGuard is bypassed
+    this.enforceStoreOwnership(
       invoice.storeId,
       operatorContext.storeId,
       'update draft invoice',
@@ -385,8 +433,9 @@ export class InvoicesService {
         throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
       }
 
-      // Store Ownership Guard: Validate operator belongs to invoice's store
-      StoreOwnershipGuard.validateStoreOwnership(
+      // S3: Enforce store ownership at service layer (defense in depth)
+      // This validation runs even if StoreScopeGuard is bypassed
+      this.enforceStoreOwnership(
         invoice.storeId,
         issueDto.storeId,
         'issue invoice',
@@ -567,8 +616,9 @@ export class InvoicesService {
       throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
     }
 
-      // Store Ownership Guard: Validate operator belongs to invoice's store
-      StoreOwnershipGuard.validateStoreOwnership(
+      // S3: Enforce store ownership at service layer (defense in depth)
+      // This validation runs even if StoreScopeGuard is bypassed
+      this.enforceStoreOwnership(
         invoice.storeId,
         operatorContext.storeId,
         'settle invoice',
@@ -677,8 +727,9 @@ export class InvoicesService {
       throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
     }
 
-    // Store Ownership Guard: Validate operator belongs to invoice's store
-    StoreOwnershipGuard.validateStoreOwnership(
+    // S3: Enforce store ownership at service layer (defense in depth)
+    // This validation runs even if StoreScopeGuard is bypassed
+    this.enforceStoreOwnership(
       invoice.storeId,
       operatorContext.storeId,
       'cancel invoice',
