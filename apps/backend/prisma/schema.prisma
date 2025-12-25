@@ -15,17 +15,21 @@ model Store {
   invoices  Invoice[]
   products  Product[]
   users     User[]
+  payments  Payment[]
 
   @@map("stores")
 }
 
 model User {
-  id              String    @id @default(uuid())
-  email           String    @unique
-  storeId         String
-  createdAt       DateTime  @default(now())
-  createdInvoices Invoice[] @relation("CreatedBy")
-  store           Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id                String    @id @default(uuid())
+  email             String    @unique
+  storeId           String
+  createdAt         DateTime  @default(now())
+  createdInvoices   Invoice[] @relation("CreatedBy")
+  issuedInvoices    Invoice[] @relation("IssuedBy")
+  settledInvoices   Invoice[] @relation("SettledBy")
+  cancelledInvoices Invoice[] @relation("CancelledBy")
+  store             Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@map("users")
 }
@@ -56,17 +60,26 @@ model Product {
 }
 
 model Invoice {
-  id          String        @id @default(uuid())
-  storeId     String
-  customerId  String?
-  status      InvoiceStatus @default(UNPAID)
-  totalAmount Decimal       @db.Decimal(10, 2)
-  createdBy   String
-  createdAt   DateTime      @default(now())
-  items       InvoiceItem[]
-  creator     User          @relation("CreatedBy", fields: [createdBy], references: [id])
-  customer    Customer?     @relation(fields: [customerId], references: [id])
-  store       Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id               String        @id @default(uuid())
+  storeId          String
+  customerId       String?
+  status           InvoiceStatus @default(DRAFT)
+  totalAmount      Decimal       @db.Decimal(10, 2)
+  paymentType      PaymentType?
+  createdBy        String
+  createdAt        DateTime      @default(now())
+  items            InvoiceItem[]
+  payment          Payment?
+  creator          User          @relation("CreatedBy", fields: [createdBy], references: [id])
+  customer         Customer?     @relation(fields: [customerId], references: [id])
+  store            Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  // Attribution fields - track who performed critical operations
+  issuedByUserId   String?
+  settledByUserId  String?
+  cancelledByUserId String?
+  issuedBy         User?         @relation("IssuedBy", fields: [issuedByUserId], references: [id])
+  settledBy        User?         @relation("SettledBy", fields: [settledByUserId], references: [id])
+  cancelledBy      User?         @relation("CancelledBy", fields: [cancelledByUserId], references: [id])
 
   @@map("invoices")
 }
@@ -83,8 +96,28 @@ model InvoiceItem {
   @@map("invoice_items")
 }
 
+model Payment {
+  id        String      @id @default(uuid())
+  storeId   String
+  invoiceId String      @unique
+  amount    Decimal     @db.Decimal(10, 2)
+  method    PaymentType
+  createdAt DateTime    @default(now())
+  store     Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  invoice   Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
 enum InvoiceStatus {
-  PAID
+  DRAFT
+  ISSUED
   UNPAID
+  PAID
   CANCELLED
+}
+
+enum PaymentType {
+  CASH
+  CREDIT
 }

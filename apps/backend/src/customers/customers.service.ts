@@ -73,7 +73,9 @@ export class CustomersService {
       throw new NotFoundException(`Customer with ID ${customerId} not found`);
     }
 
-    // Calculate totals
+    // Filter invoices by status
+    // Only UNPAID and PAID invoices have financial impact and appear in statements
+    // DRAFT and ISSUED invoices are excluded from financial calculations
     const unpaidInvoices = customer.invoices.filter(
       (invoice) => invoice.status === InvoiceStatus.UNPAID,
     );
@@ -83,24 +85,33 @@ export class CustomersService {
     const cancelledInvoices = customer.invoices.filter(
       (invoice) => invoice.status === InvoiceStatus.CANCELLED,
     );
+    const draftInvoices = customer.invoices.filter(
+      (invoice) => invoice.status === InvoiceStatus.DRAFT,
+    );
+    const issuedInvoices = customer.invoices.filter(
+      (invoice) => invoice.status === InvoiceStatus.ISSUED,
+    );
 
-    // Calculate outstanding balance (sum of unpaid invoices)
+    // Calculate outstanding balance (sum of unpaid invoices only)
     const outstandingBalance = unpaidInvoices.reduce(
       (sum, invoice) => sum + Number(invoice.totalAmount),
       0,
     );
 
-    // Calculate total sales (sum of paid invoices)
+    // Calculate total sales (sum of paid invoices only)
     const totalSales = paidInvoices.reduce(
       (sum, invoice) => sum + Number(invoice.totalAmount),
       0,
     );
 
-    // Calculate total amount (all invoices)
-    const totalAmount = customer.invoices.reduce(
-      (sum, invoice) => sum + Number(invoice.totalAmount),
-      0,
-    );
+    // Calculate total amount (only invoices with financial impact: UNPAID + PAID)
+    const totalAmount = customer.invoices
+      .filter(
+        (invoice) =>
+          invoice.status === InvoiceStatus.UNPAID ||
+          invoice.status === InvoiceStatus.PAID,
+      )
+      .reduce((sum, invoice) => sum + Number(invoice.totalAmount), 0);
 
     return {
       customer: {
@@ -112,6 +123,8 @@ export class CustomersService {
       },
       summary: {
         totalInvoices: customer.invoices.length,
+        draftInvoices: draftInvoices.length,
+        issuedInvoices: issuedInvoices.length,
         unpaidInvoices: unpaidInvoices.length,
         paidInvoices: paidInvoices.length,
         cancelledInvoices: cancelledInvoices.length,
