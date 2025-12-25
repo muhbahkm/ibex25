@@ -1,43 +1,10 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { RequirePermission } from '@/auth/RequirePermission'
+import { useAuth } from '@/auth/useAuth'
 import { formatCurrency, formatDate } from '@/lib/format'
-
-/**
- * Ledger Entry (mocked structure)
- * This matches the backend LedgerEntry model structure.
- */
-interface LedgerEntry {
-  id: string
-  type: 'SALE' | 'RECEIPT'
-  amount: number
-  createdAt: string
-}
-
-/**
- * Mocked ledger entries data
- * TEMPORARY: This will be replaced with actual API calls in future phases.
- */
-const mockLedgerEntries: LedgerEntry[] = [
-  {
-    id: 'ledger-1',
-    type: 'SALE',
-    amount: 1500.0,
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'ledger-2',
-    type: 'RECEIPT',
-    amount: 1500.0,
-    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'ledger-3',
-    type: 'SALE',
-    amount: 2500.75,
-    createdAt: new Date().toISOString(),
-  },
-]
+import { fetchLedgerEntries, LedgerEntry } from '@/lib/api'
 
 /**
  * Get Arabic label for ledger entry type
@@ -50,11 +17,49 @@ function getTypeLabel(type: 'SALE' | 'RECEIPT'): string {
  * Ledger Page Component
  *
  * Displays financial events (SALE and RECEIPT) in a read-only table.
- * This is a scaffold phase - data is mocked and no backend integration exists yet.
+ * Data is fetched from the backend API.
  */
 export default function LedgerPage() {
-  // Using mocked data for now
-  const entries = mockLedgerEntries
+  const { user } = useAuth()
+  const [entries, setEntries] = useState<LedgerEntry[]>([])
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadLedgerEntries() {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        const ledgerEntries = await fetchLedgerEntries(
+          user.storeId,
+          user.id,
+        )
+
+        if (!isMounted) return
+
+        setEntries(ledgerEntries)
+      } catch (err) {
+        if (!isMounted) return
+
+        const message =
+          err instanceof Error ? err.message : 'فشل تحميل بيانات السجل المالي.'
+        setError(message)
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadLedgerEntries()
+
+    return () => {
+      isMounted = false
+    }
+  }, [user.storeId, user.id])
 
   return (
     <RequirePermission permission="VIEW_LEDGER">
@@ -69,6 +74,13 @@ export default function LedgerPage() {
               عرض جميع الحركات المالية (مبيعات و تحصيلات)
             </p>
           </div>
+
+          {/* Error State */}
+          {error && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
 
           {/* Ledger Table */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -88,7 +100,16 @@ export default function LedgerPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {entries.length === 0 ? (
+                  {isLoading ? (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="px-6 py-8 whitespace-nowrap text-sm text-gray-500 text-center"
+                      >
+                        جاري تحميل البيانات...
+                      </td>
+                    </tr>
+                  ) : entries.length === 0 ? (
                     <tr>
                       <td
                         colSpan={3}

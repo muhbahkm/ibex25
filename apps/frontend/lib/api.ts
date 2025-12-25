@@ -146,3 +146,55 @@ export async function settleInvoice(invoiceId: string): Promise<void> {
     throw new Error(message)
   }
 }
+
+export interface LedgerEntry {
+  id: string
+  type: 'SALE' | 'RECEIPT'
+  amount: number
+  createdAt: string
+}
+
+interface LedgerResponse {
+  success: boolean
+  data?: LedgerEntry[]
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchLedgerEntries(
+  storeId: string,
+  operatorId: string,
+): Promise<LedgerEntry[]> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/ledger?storeId=${encodeURIComponent(storeId)}&operatorId=${encodeURIComponent(operatorId)}`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    throw new Error('تعذر جلب بيانات السجل المالي من الخادم.')
+  }
+
+  const body = (await res.json()) as LedgerResponse | LedgerEntry[]
+
+  // Handle both response formats:
+  // 1. Wrapped response: { success: true, data: [...] }
+  // 2. Direct array: [...]
+  if (Array.isArray(body)) {
+    return body
+  }
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب بيانات السجل المالي.'
+    throw new Error(message)
+  }
+
+  return body.data
+}
