@@ -86,5 +86,42 @@ export class LedgerService {
       createdAt: entry.createdAt.toISOString(),
     }));
   }
+
+  /**
+   * Generate CSV string from ledger entries
+   *
+   * CSV format (strict order):
+   * - Date (ISO string)
+   * - Type (SALE / RECEIPT)
+   * - Amount
+   *
+   * Rules:
+   * - No totals row
+   * - No grouping
+   * - No formatting beyond plain values
+   */
+  generateCSV(entries: Array<{ type: string; amount: number; createdAt: string }>): string {
+    // CSV header
+    const header = 'Date,Type,Amount\n';
+
+    // CSV rows
+    const rows = entries.map((entry) => {
+      const date = entry.createdAt;
+      const type = entry.type;
+      const amount = entry.amount.toString();
+
+      // Escape CSV values (handle commas, quotes, newlines)
+      const escapeCSV = (value: string): string => {
+        if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      };
+
+      return `${escapeCSV(date)},${escapeCSV(type)},${escapeCSV(amount)}`;
+    });
+
+    return header + rows.join('\n');
+  }
 }
 

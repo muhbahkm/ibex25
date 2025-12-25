@@ -74,6 +74,64 @@ export default function LedgerPage() {
     loadLedgerEntries()
   }
 
+  const handleExportCSV = async () => {
+    try {
+      setError(null)
+
+      // Build query parameters with current filters
+      const params = new URLSearchParams({
+        storeId: user.storeId,
+        operatorId: user.id,
+        export: 'csv',
+      })
+
+      if (fromDate) {
+        params.append('fromDate', new Date(fromDate).toISOString())
+      }
+
+      if (toDate) {
+        params.append('toDate', new Date(toDate).toISOString())
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '')
+      if (!baseUrl) {
+        throw new Error('إعدادات الاتصال غير مكتملة.')
+      }
+
+      const url = `${baseUrl}/ledger?${params.toString()}`
+
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+      })
+
+      if (!res.ok) {
+        throw new Error('فشل تصدير بيانات السجل المالي.')
+      }
+
+      // Get CSV content
+      const csv = await res.text()
+
+      // Create blob and trigger download
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      const urlBlob = URL.createObjectURL(blob)
+      link.setAttribute('href', urlBlob)
+      link.setAttribute('download', 'ledger.csv')
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(urlBlob)
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'فشل تصدير بيانات السجل المالي.'
+      setError(message)
+    }
+  }
 
   return (
     <RequirePermission permission="VIEW_LEDGER">
@@ -151,6 +209,14 @@ export default function LedgerPage() {
                     مسح
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={handleExportCSV}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  تصدير CSV
+                </button>
               </div>
             </form>
           </div>

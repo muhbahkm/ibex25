@@ -1,4 +1,5 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Res, Header } from '@nestjs/common';
+import { Response } from 'express';
 import { LedgerService } from './ledger.service';
 import { LedgerQueryDto } from './dto/ledger-query.dto';
 
@@ -24,6 +25,7 @@ export class LedgerController {
    * - operatorId: UUID of the operator (required)
    * - fromDate: ISO 8601 date string (optional)
    * - toDate: ISO 8601 date string (optional)
+   * - export: 'csv' (optional) - if provided, returns CSV instead of JSON
    *
    * Date Range Filtering:
    * - If fromDate provided: createdAt >= fromDate
@@ -31,11 +33,15 @@ export class LedgerController {
    * - If both provided: fromDate <= createdAt <= toDate
    * - If neither provided: return all entries
    *
+   * Export Mode:
+   * - If export=csv: Returns CSV text with proper headers
+   * - If export not provided: Returns JSON (default behavior)
+   *
    * Security:
    * - Store ownership is enforced
    * - Only ledger entries belonging to the operator's store are returned
    *
-   * Response:
+   * Response (JSON mode):
    * {
    *   success: true,
    *   data: [
@@ -47,14 +53,35 @@ export class LedgerController {
    *     }
    *   ]
    * }
+   *
+   * Response (CSV mode):
+   * - Content-Type: text/csv
+   * - Content-Disposition: attachment; filename="ledger.csv"
+   * - CSV format: Date,Type,Amount
    */
   @Get()
-  async findAll(@Query() query: LedgerQueryDto) {
-    return this.ledgerService.findAll(
+  async findAll(@Query() query: LedgerQueryDto, @Res() res: Response) {
+    const entries = await this.ledgerService.findAll(
       query.storeId,
       query.fromDate,
       query.toDate,
     );
+
+    // If export=csv, return CSV format with proper headers
+    if (query.export === 'csv') {
+      const csv = this.ledgerService.generateCSV(entries);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="ledger.csv"',
+      );
+      // Using @Res() without passthrough bypasses the interceptor
+      return res.send(csv);
+    }
+
+    // Default: return JSON (manually wrapped to match SuccessResponseInterceptor format)
+    // Using @Res() means we must manually format the response
+    return res.json({ success: true, data: entries });
   }
 }
 

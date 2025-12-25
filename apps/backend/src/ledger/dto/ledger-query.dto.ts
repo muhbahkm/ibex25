@@ -1,10 +1,10 @@
-import { IsOptional, IsDateString } from 'class-validator';
+import { IsOptional, IsDateString, IsIn } from 'class-validator';
 import { OperatorContextDto } from '../../invoices/dto/operator-context.dto';
 
 /**
  * Ledger Query DTO
  *
- * Extends OperatorContextDto with optional date range filtering.
+ * Extends OperatorContextDto with optional date range filtering and export mode.
  * Used for GET /ledger endpoint query parameters.
  */
 export class LedgerQueryDto extends OperatorContextDto {
@@ -25,5 +25,13 @@ export class LedgerQueryDto extends OperatorContextDto {
   @IsOptional()
   @IsDateString()
   toDate?: string;
+
+  /**
+   * Optional export mode
+   * If set to 'csv', returns CSV format instead of JSON
+   */
+  @IsOptional()
+  @IsIn(['csv'])
+  export?: string;
 }
 
