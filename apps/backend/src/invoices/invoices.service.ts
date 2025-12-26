@@ -786,4 +786,44 @@ export class InvoicesService {
       cancelledAt: new Date().toISOString(),
     };
   }
+
+  /**
+   * Get All Invoices
+   *
+   * Read-only method to fetch all invoices for a store.
+   * No business logic, no side effects, no mutations.
+   *
+   * @param storeId - Store ID (from AuthContext via StoreScopeGuard)
+   * @returns Array of invoices with minimal fields
+   */
+  async findAll(storeId: string) {
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        storeId,
+      },
+      select: {
+        id: true,
+        totalAmount: true,
+        status: true,
+        createdAt: true,
+        customer: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // Transform to response shape
+    return invoices.map((invoice) => ({
+      id: invoice.id,
+      customerName: invoice.customer?.name || null,
+      totalAmount: invoice.totalAmount.toString(),
+      status: invoice.status,
+      createdAt: invoice.createdAt.toISOString(),
+    }));
+  }
 }

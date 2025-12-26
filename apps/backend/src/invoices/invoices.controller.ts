@@ -2,12 +2,15 @@ import {
   Controller,
   Post,
   Put,
+  Get,
   Body,
   HttpCode,
   HttpStatus,
   Param,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { InvoicesService } from './invoices.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
@@ -32,6 +35,37 @@ import { WriteThrottleGuard } from '../core/operational/guards/write-throttle.gu
 @Controller('invoices')
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
+
+  /**
+   * Get All Invoices
+   * GET /invoices
+   *
+   * Returns all invoices for the current store.
+   * Read-only endpoint - no mutations, no side effects.
+   *
+   * Security:
+   * - Store-scoped using AuthContext.storeId (via StoreScopeGuard)
+   * - Requires VIEW_REPORTS permission (enforced in frontend)
+   *
+   * Response:
+   * {
+   *   success: true,
+   *   data: [
+   *     {
+   *       id: string,
+   *       customerName: string | null,
+   *       totalAmount: string,
+   *       status: "DRAFT" | "ISSUED" | "UNPAID" | "PAID" | "CANCELLED",
+   *       createdAt: string
+   *     }
+   *   ]
+   * }
+   */
+  @Get()
+  async findAll(@Req() request: Request) {
+    const storeId = request['storeId'] as string;
+    return this.invoicesService.findAll(storeId);
+  }
 
   /**
    * Create Draft Invoice
