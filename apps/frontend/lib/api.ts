@@ -335,6 +335,7 @@ export interface InvoiceDetail {
   status: 'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED'
   totalAmount: string
   createdAt: string
+  paymentType?: string | null
   items: Array<{
     id: string
     productId: string
