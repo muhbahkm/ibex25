@@ -158,7 +158,7 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-// Plan Model - B1: Subscription plan definitions (B2: Extended with pricing relation)
+// Plan Model - B1: Subscription plan definitions (B2: Extended with pricing relation, B3: Extended with billing accounts)
 model Plan {
   id          String              @id @default(uuid())
   code        String              @unique
@@ -169,6 +169,7 @@ model Plan {
   createdAt   DateTime            @default(now())
   subscriptions StoreSubscription[]
   pricing     PlanPricing[]
+  billingAccounts BillingAccount[]
 
   @@map("plans")
 }
@@ -182,6 +183,22 @@ enum SubscriptionStatus {
 enum BillingCycle {
   MONTHLY
   YEARLY
+}
+
+// SubscriptionState Enum - B3: Internal billing state (provider-agnostic)
+enum SubscriptionState {
+  ACTIVE
+  PAST_DUE
+  GRACE
+  SUSPENDED
+  CANCELLED
+}
+
+// BillingProvider Enum - B3: External billing provider types
+enum BillingProvider {
+  STRIPE
+  MANUAL
+  NONE
 }
 
 // Plan Model - B1: Subscription plan definitions (FOUNDATION ONLY: No pricing, no billing cycles)
@@ -223,4 +240,35 @@ model StoreSubscription {
   plan      Plan                @relation(fields: [planId], references: [id], onDelete: Restrict)
 
   @@map("store_subscriptions")
+}
+
+// BillingAccount Model - B3: Internal billing control layer (source of truth)
+model BillingAccount {
+  id            String              @id @default(uuid())
+  storeId       String              @unique
+  currentPlanId String
+  status        SubscriptionState   @default(ACTIVE)
+  billingState  Json?               // Internal state metadata (provider-agnostic)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  plan          Plan                @relation(fields: [currentPlanId], references: [id], onDelete: Restrict)
+  externalRef   ExternalBillingRef?
+
+  @@map("billing_accounts")
+}
+
+// ExternalBillingRef Model - B3: Links internal billing to external provider (Stripe, etc.)
+model ExternalBillingRef {
+  id                    String          @id @default(uuid())
+  billingAccountId      String          @unique
+  provider              BillingProvider @default(NONE)
+  externalCustomerId    String?
+  externalSubscriptionId String?
+  syncStatus            String?         // e.g. "SYNCED", "PENDING", "ERROR"
+  lastSyncedAt          DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  billingAccount        BillingAccount  @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+
+  @@map("external_billing_refs")
 }

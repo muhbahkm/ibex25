@@ -15,6 +15,7 @@ import { OperatorContextDto } from './dto/operator-context.dto';
 import { IssueInvoiceDto } from './dto/issue-invoice.dto';
 import { StoreScopeGuard } from '../core/store-scope.guard';
 import { PlanLimitGuard } from '../billing/guards/plan-limit.guard';
+import { BillingStatusGuard } from '../billing/guards/billing-status.guard';
 
 /**
  * Invoices Controller
@@ -92,10 +93,11 @@ export class InvoicesController {
    * - Operator must belong to invoice's store
    *
    * B1: Protected with PlanLimitGuard for soft enforcement of plan limits.
+   * B3: Protected with BillingStatusGuard to enforce billing account status.
    *
    * Requires operatorContext in request body.
    */
-  @UseGuards(PlanLimitGuard)
+  @UseGuards(PlanLimitGuard, BillingStatusGuard)
   @Post(':invoiceId/issue')
   @HttpCode(HttpStatus.OK)
   async issue(

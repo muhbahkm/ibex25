@@ -390,7 +390,7 @@ This logging includes:
 ---
 
 **Last Updated:** 2025-12-25  
-**Phase:** B2 - Pricing & Billing Cycles (Read-Only)
+**Phase:** B3 - Internal Billing Control Layer (Provider-Agnostic)
 
 ---
 
@@ -559,6 +559,122 @@ B2 respects all frozen contracts:
 - ✅ No invoice lifecycle changes
 - ✅ No ledger invariant changes
 - ✅ No existing API contract changes (only new read-only endpoint)
+- ✅ No multi-tenant isolation breaks
+- ✅ No accounting logic modifications
+- ✅ No writes to accounting tables
+
+---
+
+## Internal Billing Control Layer (B3)
+
+### Overview
+
+Phase B3 introduces an internal billing control layer that represents the absolute truth of subscription and billing state. External providers (Stripe, PayPal, etc.) are just executors - this layer is the source of truth.
+
+### What B3 Provides
+
+- **BillingAccount Model**: Internal billing account (source of truth)
+  - Links store to current plan
+  - Tracks subscription state (ACTIVE, PAST_DUE, GRACE, SUSPENDED, CANCELLED)
+  - Stores provider-agnostic billing state metadata
+- **ExternalBillingRef Model**: Links to external provider
+  - Tracks provider type (STRIPE, MANUAL, NONE)
+  - Stores external customer/subscription IDs
+  - Tracks sync status
+- **BillingStateMachine**: Pure domain logic for state transitions
+  - No side effects
+  - No API calls
+  - No dates calculated
+  - Only transition rules
+- **BillingAccountService**: Internal billing control (read/write)
+  - `activateSubscription()`
+  - `suspendSubscription()`
+  - `cancelSubscription()`
+  - `changePlan()`
+  - No Stripe knowledge
+- **BillingStatusGuard**: Enforces billing account status
+  - Prevents invoice issuance when status is not ACTIVE
+  - Blocks access to premium features based on status
+
+### What B3 Does NOT Provide
+
+- ❌ No Stripe SDK
+- ❌ No Webhooks
+- ❌ No Invoices
+- ❌ No Charging
+- ❌ No Time-based jobs
+- ❌ No Complex UI
+
+This is intentional - B3 is the control layer, not the execution layer.
+
+### Why This Layer Exists
+
+1. **Source of Truth**: Internal billing state is the absolute truth, not external providers
+2. **Provider Independence**: Can switch providers (Stripe → PayPal) without changing business logic
+3. **Control**: We control billing state, external providers just execute
+4. **Resilience**: If external provider is down, we still know our billing state
+
+### Architecture Philosophy
+
+**Internal Control (B3):**
+- We define billing state
+- We enforce state transitions
+- We control access based on state
+- We store billing account information
+
+**External Execution (Future):**
+- External providers execute payments
+- External providers handle webhooks
+- External providers manage customer payment methods
+- External providers process refunds
+
+**Synchronization (Future):**
+- External providers will sync with our internal state
+- We are the source of truth
+- Providers are executors
+
+### State Machine
+
+The `BillingStateMachine` defines pure domain logic:
+
+**States:**
+- `ACTIVE`: Subscription is active and operational
+- `PAST_DUE`: Payment is past due
+- `GRACE`: In grace period
+- `SUSPENDED`: Subscription is suspended
+- `CANCELLED`: Subscription is cancelled (terminal state)
+
+**Allowed Transitions:**
+- `ACTIVE` → `PAST_DUE`, `SUSPENDED`, `CANCELLED`
+- `PAST_DUE` → `ACTIVE`, `GRACE`, `SUSPENDED`, `CANCELLED`
+- `GRACE` → `ACTIVE`, `SUSPENDED`, `CANCELLED`
+- `SUSPENDED` → `ACTIVE`, `CANCELLED`
+- `CANCELLED` → (no transitions - terminal state)
+
+**Rules:**
+- Only `ACTIVE` state allows invoice issuance
+- `ACTIVE` and `GRACE` states allow premium feature access
+- `PAST_DUE` and `GRACE` states require payment
+- `CANCELLED` is terminal (no further transitions)
+
+### Enforcement
+
+**BillingStatusGuard:**
+- Applied to `POST /invoices/:id/issue` endpoint
+- Checks `BillingAccount.status`
+- Blocks invoice issuance if status is not `ACTIVE`
+- Returns `403 Forbidden` with `BILLING_STATUS_BLOCKED` error code
+
+**Backward Compatibility:**
+- If no billing account exists, guard allows request (for migration period)
+- Graceful degradation if billing account lookup fails
+
+### Contract Safety
+
+B3 respects all frozen contracts:
+- ✅ No invoice lifecycle changes
+- ✅ No ledger invariant changes
+- ✅ No existing API contract changes (only new guard)
 - ✅ No multi-tenant isolation breaks
 - ✅ No accounting logic modifications
 - ✅ No writes to accounting tables
