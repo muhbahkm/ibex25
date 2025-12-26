@@ -541,6 +541,71 @@ export async function updateInvoiceDraft(
   }
 }
 
+// Issue Invoice API
+interface IssueInvoiceRequest {
+  paymentType: 'CASH' | 'CREDIT'
+  operatorId: string
+  storeId: string
+}
+
+interface IssueInvoiceResponse {
+  success: boolean
+  data?: {
+    id: string
+    status: 'PAID' | 'UNPAID'
+    previousStatus: string
+    issuedAt: string
+    paymentType: 'CASH' | 'CREDIT'
+    [key: string]: unknown
+  }
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function issueInvoice(
+  invoiceId: string,
+  paymentType: 'CASH' | 'CREDIT',
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<void> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/invoices/${invoiceId}/issue`
+
+  const body: IssueInvoiceRequest = {
+    paymentType,
+    operatorId: userId,
+    storeId,
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    const errorBody = (await res.json()) as IssueInvoiceResponse
+    const message = errorBody.error?.message || 'فشل إصدار الفاتورة.'
+    throw new Error(message)
+  }
+
+  const responseBody = (await res.json()) as IssueInvoiceResponse
+
+  if (!responseBody.success) {
+    const message = responseBody.error?.message || 'فشل إصدار الفاتورة.'
+    throw new Error(message)
+  }
+}
+
 // B1: Billing API
 export interface StorePlan {
   plan: {
