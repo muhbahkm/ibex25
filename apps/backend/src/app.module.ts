@@ -7,6 +7,7 @@ import { LedgerModule } from './ledger/ledger.module';
 import { BillingModule } from './billing/billing.module';
 import { StripeModule } from './billing/stripe/stripe.module';
 import { UsageModule } from './usage/usage.module';
+import { ProductsModule } from './products/products.module';
 import { PrismaService } from './prisma.service';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
@@ -18,6 +19,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     BillingModule,
     StripeModule, // B4: Stripe integration
     UsageModule,
+    ProductsModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
