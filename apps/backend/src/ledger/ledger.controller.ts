@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { LedgerService } from './ledger.service';
 import { LedgerQueryDto } from './dto/ledger-query.dto';
 import { StoreScopeGuard } from '../core/store-scope.guard';
+import { RateLimitGuard } from '../core/operational/guards/rate-limit.guard';
 
 /**
  * Ledger Controller
@@ -11,8 +12,9 @@ import { StoreScopeGuard } from '../core/store-scope.guard';
  * Ledger entries are append-only financial events (SALE, RECEIPT).
  *
  * S2: Protected with StoreScopeGuard to enforce tenant isolation.
+ * C1: Protected with RateLimitGuard for operational safety.
  */
-@UseGuards(StoreScopeGuard)
+@UseGuards(StoreScopeGuard, RateLimitGuard)
 @Controller('ledger')
 export class LedgerController {
   constructor(private readonly ledgerService: LedgerService) {}

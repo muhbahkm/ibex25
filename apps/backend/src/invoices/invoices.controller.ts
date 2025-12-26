@@ -16,6 +16,8 @@ import { IssueInvoiceDto } from './dto/issue-invoice.dto';
 import { StoreScopeGuard } from '../core/store-scope.guard';
 import { PlanLimitGuard } from '../billing/guards/plan-limit.guard';
 import { BillingStatusGuard } from '../billing/guards/billing-status.guard';
+import { RateLimitGuard } from '../core/operational/guards/rate-limit.guard';
+import { WriteThrottleGuard } from '../core/operational/guards/write-throttle.guard';
 
 /**
  * Invoices Controller
@@ -23,8 +25,10 @@ import { BillingStatusGuard } from '../billing/guards/billing-status.guard';
  * S3: Protected with StoreScopeGuard to enforce tenant isolation at controller level.
  * Additional enforcement exists at service layer (defense in depth).
  * B1: PlanLimitGuard applied to issue endpoint for soft enforcement.
+ * B3: BillingStatusGuard applied to issue endpoint for billing status enforcement.
+ * C1: RateLimitGuard and WriteThrottleGuard applied for operational safety.
  */
-@UseGuards(StoreScopeGuard)
+@UseGuards(StoreScopeGuard, RateLimitGuard)
 @Controller('invoices')
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
@@ -94,10 +98,11 @@ export class InvoicesController {
    *
    * B1: Protected with PlanLimitGuard for soft enforcement of plan limits.
    * B3: Protected with BillingStatusGuard to enforce billing account status.
+   * C1: Protected with WriteThrottleGuard for write operation throttling.
    *
    * Requires operatorContext in request body.
    */
-  @UseGuards(PlanLimitGuard, BillingStatusGuard)
+  @UseGuards(PlanLimitGuard, BillingStatusGuard, WriteThrottleGuard)
   @Post(':invoiceId/issue')
   @HttpCode(HttpStatus.OK)
   async issue(
@@ -113,9 +118,11 @@ export class InvoicesController {
    *
    * Permission: Store manager only (conceptual - not technical role yet)
    * Attribution: settledByUserId is recorded
+   * C1: Protected with WriteThrottleGuard for write operation throttling.
    *
    * Requires operatorContext in request body.
    */
+  @UseGuards(WriteThrottleGuard)
   @Post(':invoiceId/settle')
   @HttpCode(HttpStatus.OK)
   async settle(
@@ -131,9 +138,11 @@ export class InvoicesController {
    *
    * Permission: Store manager only (conceptual - not technical role yet)
    * Attribution: cancelledByUserId is recorded
+   * C1: Protected with WriteThrottleGuard for write operation throttling.
    *
    * Requires operatorContext in request body.
    */
+  @UseGuards(WriteThrottleGuard)
   @Post(':invoiceId/cancel')
   @HttpCode(HttpStatus.OK)
   async cancel(

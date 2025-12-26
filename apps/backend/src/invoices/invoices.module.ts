@@ -3,9 +3,10 @@ import { InvoicesService } from './invoices.service';
 import { InvoicesController } from './invoices.controller';
 import { PrismaService } from '../prisma.service';
 import { BillingModule } from '../billing/billing.module';
+import { OperationalModule } from '../core/operational/operational.module';
 
 @Module({
-  imports: [BillingModule],
+  imports: [BillingModule, OperationalModule],
   controllers: [InvoicesController],
   providers: [InvoicesService, PrismaService],
 })
