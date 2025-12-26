@@ -68,6 +68,43 @@ export class InvoicesController {
   }
 
   /**
+   * Get Single Invoice
+   * GET /invoices/:id
+   *
+   * Returns a single invoice by ID for the current store.
+   * Read-only endpoint - no mutations, no side effects.
+   *
+   * Security:
+   * - Store-scoped using AuthContext.storeId (via StoreScopeGuard)
+   * - Requires VIEW_REPORTS permission (enforced in frontend)
+   *
+   * Response:
+   * {
+   *   success: true,
+   *   data: {
+   *     id: string,
+   *     customerId: string | null,
+   *     customerName: string | null,
+   *     status: "DRAFT" | "ISSUED" | "UNPAID" | "PAID" | "CANCELLED",
+   *     totalAmount: string,
+   *     createdAt: string,
+   *     items: Array<{
+   *       id: string,
+   *       productId: string,
+   *       productName: string,
+   *       quantity: number,
+   *       unitPrice: string
+   *     }>
+   *   }
+   * }
+   */
+  @Get(':id')
+  async findOne(@Param('id') id: string, @Req() request: Request) {
+    const storeId = request['storeId'] as string;
+    return this.invoicesService.findOne(id, storeId);
+  }
+
+  /**
    * Create Draft Invoice
    * POST /invoices
    *

@@ -826,4 +826,69 @@ export class InvoicesService {
       createdAt: invoice.createdAt.toISOString(),
     }));
   }
+
+  /**
+   * Get Single Invoice
+   *
+   * Read-only method to fetch a single invoice by ID for a store.
+   * No business logic, no side effects, no mutations.
+   *
+   * @param invoiceId - Invoice ID
+   * @param storeId - Store ID (from AuthContext via StoreScopeGuard)
+   * @returns Invoice with items and product details
+   */
+  async findOne(invoiceId: string, storeId: string) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: {
+        id: invoiceId,
+        storeId,
+      },
+      select: {
+        id: true,
+        customerId: true,
+        status: true,
+        totalAmount: true,
+        createdAt: true,
+        customer: {
+          select: {
+            name: true,
+          },
+        },
+        items: {
+          select: {
+            id: true,
+            productId: true,
+            quantity: true,
+            unitPrice: true,
+            product: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
+    }
+
+    // Transform to response shape
+    return {
+      id: invoice.id,
+      customerId: invoice.customerId,
+      customerName: invoice.customer?.name || null,
+      status: invoice.status,
+      totalAmount: invoice.totalAmount.toString(),
+      createdAt: invoice.createdAt.toISOString(),
+      items: invoice.items.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        productName: item.product.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice.toString(),
+      })),
+    };
+  }
 }
