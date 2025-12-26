@@ -10,7 +10,10 @@ async function bootstrap() {
     // Validate environment variables before starting
     validateEnvironment();
 
-    const app = await NestFactory.create(AppModule);
+    // B4: Configure raw body for Stripe webhook signature verification
+    const app = await NestFactory.create(AppModule, {
+      rawBody: true, // Required for Stripe webhook signature verification
+    });
 
     // Enable CORS for all origins (for development)
     app.enableCors({

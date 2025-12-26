@@ -12,6 +12,9 @@ interface EnvironmentConfig {
   DATABASE_URL: string;
   PORT?: string;
   NODE_ENV?: string;
+  // B4: Stripe configuration (optional - only required when Stripe is enabled)
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
 }
 
 /**
