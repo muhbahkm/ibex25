@@ -123,10 +123,12 @@ export function TableCell({
   children,
   align = 'right',
   className = '',
+  colSpan,
 }: {
   children: React.ReactNode
   align?: 'left' | 'right' | 'center'
   className?: string
+  colSpan?: number
 }) {
   const alignStyles = {
     left: 'text-left',
@@ -136,6 +138,7 @@ export function TableCell({
 
   return (
     <td
+      colSpan={colSpan}
       className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${alignStyles[align]} ${className}`}
     >
       {children}

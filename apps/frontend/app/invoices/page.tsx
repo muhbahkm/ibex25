@@ -1,48 +1,25 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { RequirePermission } from '@/auth/RequirePermission'
 import { useAuth } from '@/auth/useAuth'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { fetchInvoices, Invoice, settleInvoice } from '@/lib/api'
-
-/**
- * Get Arabic label for invoice status
- */
-function getStatusLabel(
-  status: 'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED',
-): string {
-  const labels: Record<
-    'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED',
-    string
-  > = {
-    DRAFT: 'مسودة',
-    ISSUED: 'مُصدرة',
-    UNPAID: 'غير مسددة',
-    PAID: 'مسددة',
-    CANCELLED: 'ملغاة',
-  }
-  return labels[status]
-}
-
-/**
- * Get badge color class for invoice status
- */
-function getStatusBadgeColor(
-  status: 'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED',
-): string {
-  const colors: Record<
-    'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED',
-    string
-  > = {
-    DRAFT: 'bg-gray-100 text-gray-800',
-    ISSUED: 'bg-blue-100 text-blue-800',
-    UNPAID: 'bg-yellow-100 text-yellow-800',
-    PAID: 'bg-green-100 text-green-800',
-    CANCELLED: 'bg-red-100 text-red-800',
-  }
-  return colors[status]
-}
+import {
+  Button,
+  StatusBadge,
+  Table,
+  TableHeader,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+  LoadingState,
+  EmptyState,
+  ErrorMessage,
+} from '@/components/ui'
+import Icon from '@/components/Icon'
 
 /**
  * Invoice List Page Component
@@ -112,106 +89,111 @@ export default function InvoicesPage() {
 
   return (
     <RequirePermission permission="VIEW_REPORTS">
-      <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Page Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">الفواتير</h1>
+      <div className="max-w-7xl mx-auto">
+        {/* Page Header */}
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-page-title mb-2">الفواتير</h1>
+            <p className="text-muted">
+              عرض وإدارة جميع الفواتير في المتجر
+            </p>
           </div>
-
-          {/* Error State */}
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
-
-          {/* Invoices Table */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      التاريخ
-                    </th>
-                    <th className="px-6 py-3.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      العميل
-                    </th>
-                    <th className="px-6 py-3.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      الإجمالي
-                    </th>
-                    <th className="px-6 py-3.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      الحالة
-                    </th>
-                    <th className="px-6 py-3.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      الإجراءات
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {isLoading ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-6 py-8 whitespace-nowrap text-sm text-gray-500 text-center"
-                      >
-                        جاري تحميل الفواتير...
-                      </td>
-                    </tr>
-                  ) : invoices.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-6 py-8 whitespace-nowrap text-sm text-gray-500 text-center"
-                      >
-                        لا توجد فواتير حتى الآن.
-                      </td>
-                    </tr>
-                  ) : (
-                    invoices.map((invoice) => (
-                      <tr key={invoice.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(invoice.createdAt)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {invoice.customerName || 'عميل نقدي'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {formatCurrency(Number(invoice.totalAmount))} ر.س
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                              invoice.status,
-                            )}`}
-                          >
-                            {getStatusLabel(invoice.status)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {invoice.status === 'UNPAID' && (
-                            <RequirePermission permission="SETTLE_INVOICE">
-                              <button
-                                onClick={() => handleSettle(invoice.id)}
-                                disabled={settlingInvoiceId === invoice.id}
-                                className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {settlingInvoiceId === invoice.id
-                                  ? 'جاري التسوية...'
-                                  : 'تسوية'}
-                              </button>
-                            </RequirePermission>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <RequirePermission permission="ISSUE_INVOICE">
+            <Link href="/invoices/new">
+              <Button variant="primary" size="md" className="gap-2">
+                <Icon name="add" />
+                <span>فاتورة جديدة</span>
+              </Button>
+            </Link>
+          </RequirePermission>
         </div>
+
+        {/* Error State */}
+        {error && <ErrorMessage message={error} className="mb-6" />}
+
+        {/* Invoices Table */}
+        {isLoading ? (
+          <Table>
+            <TableBody>
+              <TableRow>
+                <TableCell colSpan={5} align="center" className="py-12">
+                  <LoadingState message="جاري تحميل الفواتير..." />
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        ) : invoices.length === 0 ? (
+          <Table>
+            <TableBody>
+              <TableRow>
+                <TableCell colSpan={5} align="center" className="py-12">
+                  <EmptyState
+                    message="لا توجد فواتير حتى الآن"
+                    description="ابدأ بإنشاء فاتورة جديدة لإدارة مبيعاتك"
+                  />
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableHeaderCell align="right">التاريخ</TableHeaderCell>
+              <TableHeaderCell align="right">العميل</TableHeaderCell>
+              <TableHeaderCell align="left">الإجمالي</TableHeaderCell>
+              <TableHeaderCell align="right">الحالة</TableHeaderCell>
+              <TableHeaderCell align="right">الإجراءات</TableHeaderCell>
+            </TableHeader>
+            <TableBody>
+              {invoices.map((invoice) => (
+                <TableRow key={invoice.id}>
+                  <TableCell align="right">
+                    <span className="text-body">
+                      {formatDate(invoice.createdAt)}
+                    </span>
+                  </TableCell>
+                  <TableCell align="right">
+                    <span className="text-body">
+                      {invoice.customerName || 'عميل نقدي'}
+                    </span>
+                  </TableCell>
+                  <TableCell align="left">
+                    <span className="text-numeric">
+                      {formatCurrency(Number(invoice.totalAmount))} ر.س
+                    </span>
+                  </TableCell>
+                  <TableCell align="right">
+                    <StatusBadge status={invoice.status} />
+                  </TableCell>
+                  <TableCell align="right">
+                    <div className="flex items-center gap-2 justify-end">
+                      <Link
+                        href={`/invoices/${invoice.id}`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-gray-700 hover:text-primary-600 transition-colors"
+                      >
+                        <Icon name="visibility" className="text-base" />
+                        <span>عرض</span>
+                      </Link>
+                      {invoice.status === 'UNPAID' && (
+                        <RequirePermission permission="SETTLE_INVOICE">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleSettle(invoice.id)}
+                            disabled={settlingInvoiceId === invoice.id}
+                            isLoading={settlingInvoiceId === invoice.id}
+                          >
+                            تسوية
+                          </Button>
+                        </RequirePermission>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     </RequirePermission>
   )
