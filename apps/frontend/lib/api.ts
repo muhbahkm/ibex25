@@ -121,7 +121,12 @@ interface SettleResponse {
   }
 }
 
-export async function settleInvoice(invoiceId: string): Promise<void> {
+export async function settleInvoice(
+  invoiceId: string,
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<void> {
   const baseUrl = getApiBaseUrl()
   const url = `${baseUrl}/invoices/${invoiceId}/settle`
 
@@ -129,7 +134,16 @@ export async function settleInvoice(invoiceId: string): Promise<void> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
     },
+    body: JSON.stringify({
+      operatorContext: {
+        operatorId: userId,
+        storeId: storeId,
+      },
+    }),
     cache: 'no-store',
   })
 
@@ -145,6 +159,56 @@ export async function settleInvoice(invoiceId: string): Promise<void> {
     const message = body.error?.message || 'فشل تسوية الفاتورة.'
     throw new Error(message)
   }
+}
+
+export interface Invoice {
+  id: string
+  customerName: string | null
+  totalAmount: string
+  status: 'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED'
+  createdAt: string
+}
+
+interface InvoicesResponse {
+  success: boolean
+  data?: Invoice[]
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchInvoices(
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<Invoice[]> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/invoices`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    throw new Error('تعذر جلب قائمة الفواتير من الخادم.')
+  }
+
+  const body = (await res.json()) as InvoicesResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب قائمة الفواتير.'
+    throw new Error(message)
+  }
+
+  return body.data
 }
 
 export interface LedgerEntry {

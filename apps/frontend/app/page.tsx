@@ -12,6 +12,8 @@ import {
 import { formatCurrency, formatDate, formatPriceFromCents, formatBillingCycle } from '@/lib/format'
 import { RequirePermission } from '@/auth/RequirePermission'
 import { useBilling } from '@/billing/useBilling'
+import { useAuth } from '@/auth/useAuth'
+import { useAuth } from '@/auth/useAuth'
 
 interface DashboardState {
   totalSales: number
@@ -20,6 +22,7 @@ interface DashboardState {
 }
 
 export default function Home() {
+  const { user } = useAuth()
   const [customers, setCustomers] = useState<CustomerSummary[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
     null,
@@ -166,7 +169,7 @@ export default function Home() {
       setSettlingInvoiceId(invoiceId)
       setError(null)
 
-      await settleInvoice(invoiceId)
+      await settleInvoice(invoiceId, user.id, user.storeId, user.role)
 
       // Re-fetch statement after successful settlement
       const statementData = await fetchCustomerStatement(selectedCustomerId)
