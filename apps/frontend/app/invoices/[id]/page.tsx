@@ -7,44 +7,19 @@ import { RequirePermission } from '@/auth/RequirePermission'
 import { useAuth } from '@/auth/useAuth'
 import { fetchInvoice, settleInvoice, InvoiceDetail } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/format'
-
-/**
- * Get Arabic label for invoice status
- */
-function getStatusLabel(
-  status: 'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED',
-): string {
-  const labels: Record<
-    'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED',
-    string
-  > = {
-    DRAFT: 'مسودة',
-    ISSUED: 'مُصدرة',
-    UNPAID: 'غير مسددة',
-    PAID: 'مسددة',
-    CANCELLED: 'ملغاة',
-  }
-  return labels[status]
-}
-
-/**
- * Get badge color class for invoice status
- */
-function getStatusBadgeColor(
-  status: 'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED',
-): string {
-  const colors: Record<
-    'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED',
-    string
-  > = {
-    DRAFT: 'bg-gray-100 text-gray-800',
-    ISSUED: 'bg-blue-100 text-blue-800',
-    UNPAID: 'bg-yellow-100 text-yellow-800',
-    PAID: 'bg-green-100 text-green-800',
-    CANCELLED: 'bg-red-100 text-red-800',
-  }
-  return colors[status]
-}
+import {
+  Button,
+  StatusBadge,
+  Table,
+  TableHeader,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+  LoadingState,
+  ErrorMessage,
+} from '@/components/ui'
+import Icon from '@/components/Icon'
 
 /**
  * Get Arabic label for payment type
@@ -130,12 +105,8 @@ export default function InvoiceDetailsPage() {
   if (isLoading) {
     return (
       <RequirePermission permission="VIEW_REPORTS">
-        <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center py-12">
-              <p className="text-gray-500">جاري التحميل...</p>
-            </div>
-          </div>
+        <div className="max-w-4xl mx-auto">
+          <LoadingState message="جاري تحميل بيانات الفاتورة..." />
         </div>
       </RequirePermission>
     )
@@ -144,22 +115,15 @@ export default function InvoiceDetailsPage() {
   if (!invoice) {
     return (
       <RequirePermission permission="VIEW_REPORTS">
-        <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-800">
-                {error || 'الفاتورة غير موجودة.'}
-              </p>
-            </div>
-            <div className="mt-4">
-              <Link
-                href="/invoices"
-                className="text-blue-600 hover:text-blue-800 text-sm"
-              >
-                ← العودة إلى قائمة الفواتير
-              </Link>
-            </div>
-          </div>
+        <div className="max-w-4xl mx-auto space-y-4">
+          <ErrorMessage message={error || 'الفاتورة غير موجودة.'} />
+          <Link
+            href="/invoices"
+            className="inline-flex items-center gap-2 text-body text-primary-600 hover:text-primary-700"
+          >
+            <Icon name="arrow_back" />
+            <span>العودة إلى قائمة الفواتير</span>
+          </Link>
         </div>
       </RequirePermission>
     )
@@ -171,165 +135,142 @@ export default function InvoiceDetailsPage() {
 
   return (
     <RequirePermission permission="VIEW_REPORTS">
-      <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-6">
-            <div className="flex justify-between items-center">
-              <h1 className="text-2xl font-bold text-gray-900">تفاصيل الفاتورة</h1>
-              <Link
-                href="/invoices"
-                className="text-blue-600 hover:text-blue-800 text-sm"
-              >
-                ← العودة إلى القائمة
-              </Link>
-            </div>
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Page Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-page-title mb-1">تفاصيل الفاتورة</h1>
+            <p className="text-muted">رقم الفاتورة: {invoice.id}</p>
           </div>
+          <Link
+            href="/invoices"
+            className="inline-flex items-center gap-2 text-body text-gray-700 hover:text-gray-900"
+          >
+            <Icon name="arrow_back" />
+            <span>العودة إلى القائمة</span>
+          </Link>
+        </div>
 
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
+        {/* Error State */}
+        {error && <ErrorMessage message={error} />}
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            {/* Invoice Header */}
-            <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Invoice Card */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
+          {/* Invoice Header - Status & Metadata */}
+          <div className="p-6">
+            <div className="flex flex-wrap items-center gap-6 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  رقم الفاتورة
-                </label>
-                <p className="text-sm text-gray-900">{invoice.id}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-500 mb-1">
                   الحالة
                 </label>
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                    invoice.status,
-                  )}`}
-                >
-                  {getStatusLabel(invoice.status)}
-                </span>
+                <StatusBadge status={invoice.status} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  تاريخ الإنشاء
+                </label>
+                <span className="text-body">{formatDate(invoice.createdAt)}</span>
               </div>
               {invoice.paymentType && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
                     نوع الدفع
                   </label>
-                  <p className="text-sm text-gray-900">
+                  <span className="text-body">
                     {getPaymentTypeLabel(invoice.paymentType)}
-                  </p>
+                  </span>
                 </div>
               )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  تاريخ الإنشاء
-                </label>
-                <p className="text-sm text-gray-900">
-                  {formatDate(invoice.createdAt)}
-                </p>
-              </div>
             </div>
 
             {/* Customer */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="pt-4 border-t border-gray-200">
+              <label className="block text-xs font-medium text-gray-500 mb-2">
                 العميل
               </label>
-              <p className="text-sm text-gray-900">
-                {invoice.customerName || 'عميل نقدي'}
-              </p>
+              <p className="text-body">{invoice.customerName || 'عميل نقدي'}</p>
             </div>
+          </div>
 
-            {/* Invoice Items */}
-            <div className="mb-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
-                العناصر
-              </h2>
-              {invoice.items.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  لا توجد عناصر
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          المنتج
-                        </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          الكمية
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          سعر الوحدة
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          الإجمالي
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {invoice.items.map((item) => (
-                        <tr key={item.id}>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.productName}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.quantity}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatCurrency(Number(item.unitPrice))} ر.س
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {formatCurrency(
-                              calculateLineTotal(item.quantity, item.unitPrice),
-                            )}{' '}
-                            ر.س
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Total */}
-            <div className="mb-6 border-t border-gray-200 pt-4">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-medium text-gray-900">
-                  الإجمالي:
-                </span>
-                <span className="text-lg font-bold text-gray-900">
-                  {formatCurrency(Number(invoice.totalAmount))} ر.س
-                </span>
+          {/* Invoice Items */}
+          <div className="p-6">
+            <h2 className="text-section-title mb-4">العناصر</h2>
+            {invoice.items.length === 0 ? (
+              <div className="text-center py-8 text-muted">
+                لا توجد عناصر
               </div>
-            </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableHeaderCell align="right">المنتج</TableHeaderCell>
+                  <TableHeaderCell align="right">الكمية</TableHeaderCell>
+                  <TableHeaderCell align="left">سعر الوحدة</TableHeaderCell>
+                  <TableHeaderCell align="left">الإجمالي</TableHeaderCell>
+                </TableHeader>
+                <TableBody>
+                  {invoice.items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell align="right">
+                        <span className="text-body">{item.productName}</span>
+                      </TableCell>
+                      <TableCell align="right">
+                        <span className="text-body">{item.quantity}</span>
+                      </TableCell>
+                      <TableCell align="left">
+                        <span className="text-numeric">
+                          {formatCurrency(Number(item.unitPrice))} ر.س
+                        </span>
+                      </TableCell>
+                      <TableCell align="left">
+                        <span className="text-numeric">
+                          {formatCurrency(
+                            calculateLineTotal(item.quantity, item.unitPrice),
+                          )}{' '}
+                          ر.س
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
 
-            {/* Actions */}
-            <div className="flex justify-end gap-4">
-              {invoice.status === 'DRAFT' && (
-                <Link
-                  href={`/invoices/${invoiceId}/edit`}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  تعديل
-                </Link>
-              )}
-              {invoice.status === 'UNPAID' && (
-                <RequirePermission permission="SETTLE_INVOICE">
-                  <button
-                    onClick={handleSettle}
-                    disabled={isSettling}
-                    className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSettling ? 'جاري التسوية...' : 'تسوية الفاتورة'}
-                  </button>
-                </RequirePermission>
-              )}
+          {/* Total */}
+          <div className="p-6 bg-gray-50">
+            <div className="flex justify-between items-center">
+              <span className="text-section-title">الإجمالي:</span>
+              <span className="text-section-title text-numeric">
+                {formatCurrency(Number(invoice.totalAmount))} ر.س
+              </span>
             </div>
+          </div>
+
+          {/* Actions */}
+          <div className="p-6 flex justify-end gap-3">
+            {invoice.status === 'DRAFT' && (
+              <Link href={`/invoices/${invoiceId}/edit`}>
+                <Button variant="primary" size="md" className="gap-2">
+                  <Icon name="edit" />
+                  <span>تعديل</span>
+                </Button>
+              </Link>
+            )}
+            {invoice.status === 'UNPAID' && (
+              <RequirePermission permission="SETTLE_INVOICE">
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={handleSettle}
+                  disabled={isSettling}
+                  isLoading={isSettling}
+                  className="gap-2"
+                >
+                  {!isSettling && <Icon name="check_circle" />}
+                  <span>تسوية الفاتورة</span>
+                </Button>
+              </RequirePermission>
+            )}
           </div>
         </div>
       </div>
