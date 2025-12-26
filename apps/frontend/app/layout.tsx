@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { IBM_Plex_Sans_Arabic } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/auth/AuthProvider'
+import { LayoutWrapper } from '@/components/layout/LayoutWrapper'
 
 const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
   subsets: ['arabic'],
@@ -28,7 +29,9 @@ export default function RootLayout({
         />
       </head>
       <body className={`${ibmPlexSansArabic.variable} font-sans antialiased`}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <LayoutWrapper>{children}</LayoutWrapper>
+        </AuthProvider>
       </body>
     </html>
   )
