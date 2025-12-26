@@ -1,3 +1,5 @@
+import { ForbiddenException } from '@nestjs/common';
+
 /**
  * Tenant Boundary Definition
  *
@@ -147,21 +149,22 @@ export function isSameTenant(storeId1: string, storeId2: string): boolean {
 
 /**
  * Extract storeId from request context
- * 
+ *
  * This is a placeholder for future implementation.
  * Currently, storeId comes from OperatorContextDto in request body.
- * 
+ *
  * In future auth system, this will extract from:
  * - JWT token claims
  * - Request headers
  * - Session data
- * 
+ *
  * @param request - Express request object (placeholder)
  * @returns storeId from request context
  */
 export function getStoreIdFromRequest(request: any): string | null {
   // TODO: Implement when auth system is ready
   // For now, storeId comes from request body (OperatorContextDto)
-  return request.body?.operatorContext?.storeId || request.body?.storeId || null;
+  return (
+    request.body?.operatorContext?.storeId || request.body?.storeId || null
+  );
 }
-

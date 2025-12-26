@@ -64,14 +64,18 @@ export class BillingStateMachine {
    * Check if a state allows access to premium features
    */
   static canAccessPremiumFeatures(state: SubscriptionState): boolean {
-    return state === SubscriptionState.ACTIVE || state === SubscriptionState.GRACE;
+    return (
+      state === SubscriptionState.ACTIVE || state === SubscriptionState.GRACE
+    );
   }
 
   /**
    * Check if a state is in a payment-required state
    */
   static requiresPayment(state: SubscriptionState): boolean {
-    return state === SubscriptionState.PAST_DUE || state === SubscriptionState.GRACE;
+    return (
+      state === SubscriptionState.PAST_DUE || state === SubscriptionState.GRACE
+    );
   }
 
   /**
@@ -96,4 +100,3 @@ export class BillingStateMachine {
     return transitions[from] ?? [];
   }
 }
-

@@ -95,4 +95,3 @@ export class BillingStatusGuard implements CanActivate {
     return messages[status] || status;
   }
 }
-

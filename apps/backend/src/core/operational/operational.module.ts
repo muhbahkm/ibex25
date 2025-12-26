@@ -19,11 +19,6 @@ import { PrismaService } from '../../prisma.service';
     WriteThrottleGuard,
     PrismaService,
   ],
-  exports: [
-    UsageSnapshotService,
-    RateLimitGuard,
-    WriteThrottleGuard,
-  ],
+  exports: [UsageSnapshotService, RateLimitGuard, WriteThrottleGuard],
 })
 export class OperationalModule {}
-

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { SubscriptionState, Prisma } from '@prisma/client';
 import { BillingStateMachine } from './domain/billing-state-machine';
@@ -47,7 +51,11 @@ export class BillingAccountService {
   /**
    * Create a billing account for a store
    */
-  async create(storeId: string, planId: string, billingState?: Prisma.InputJsonValue) {
+  async create(
+    storeId: string,
+    planId: string,
+    billingState?: Prisma.InputJsonValue,
+  ) {
     // Check if account already exists
     const existing = await this.prisma.billingAccount.findUnique({
       where: { storeId },
@@ -246,4 +254,3 @@ export class BillingAccountService {
     });
   }
 }
-

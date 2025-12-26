@@ -29,10 +29,7 @@ export class PricingService {
   /**
    * Get pricing for a specific plan and billing cycle
    */
-  async getPricingByPlanAndCycle(
-    planId: string,
-    billingCycle: BillingCycle,
-  ) {
+  async getPricingByPlanAndCycle(planId: string, billingCycle: BillingCycle) {
     const pricing = await this.prisma.planPricing.findUnique({
       where: {
         planId_billingCycle: {
@@ -86,4 +83,3 @@ export class PricingService {
     };
   }
 }
-

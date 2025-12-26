@@ -1,4 +1,10 @@
-import { Controller, Get, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  UseGuards,
+  Req,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { SubscriptionsService } from './subscriptions.service';
 import { PricingService } from './pricing.service';
@@ -40,7 +46,9 @@ export class BillingController {
    * }
    */
   @Get('plan')
-  async getPlan(@Req() req: Request): Promise<{ success: true; data: StorePlanDto }> {
+  async getPlan(
+    @Req() req: Request,
+  ): Promise<{ success: true; data: StorePlanDto }> {
     const storeId = req['storeId'] as string;
 
     if (!storeId) {
@@ -120,4 +128,3 @@ export class BillingController {
     };
   }
 }
-

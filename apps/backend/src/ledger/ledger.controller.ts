@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res, Header, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Query, Res, UseGuards, Req } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { LedgerService } from './ledger.service';
 import { LedgerQueryDto } from './dto/ledger-query.dto';
@@ -85,10 +85,7 @@ export class LedgerController {
     if (query.export === 'csv') {
       const csv = this.ledgerService.generateCSV(entries);
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader(
-        'Content-Disposition',
-        'attachment; filename="ledger.csv"',
-      );
+      res.setHeader('Content-Disposition', 'attachment; filename="ledger.csv"');
       // Using @Res() without passthrough bypasses the interceptor
       return res.send(csv);
     }
@@ -98,4 +95,3 @@ export class LedgerController {
     return res.json({ success: true, data: entries });
   }
 }
-

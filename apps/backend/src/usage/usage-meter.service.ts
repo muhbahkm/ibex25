@@ -72,17 +72,13 @@ export class UsageMeterService {
     boundaries: { start: Date; end: Date },
   ): Promise<UsageMetrics> {
     // Compute all metrics in parallel for efficiency
-    const [
-      invoicesIssued,
-      ledgerEntries,
-      activeInvoices,
-      activeCustomers,
-    ] = await Promise.all([
-      this.computeInvoicesIssued(storeId, boundaries),
-      this.computeLedgerEntries(storeId, boundaries),
-      this.computeActiveInvoices(storeId),
-      this.computeActiveCustomers(storeId),
-    ]);
+    const [invoicesIssued, ledgerEntries, activeInvoices, activeCustomers] =
+      await Promise.all([
+        this.computeInvoicesIssued(storeId, boundaries),
+        this.computeLedgerEntries(storeId, boundaries),
+        this.computeActiveInvoices(storeId),
+        this.computeActiveCustomers(storeId),
+      ]);
 
     return {
       invoicesIssued,
@@ -169,4 +165,3 @@ export class UsageMeterService {
     return customersWithInvoices.length;
   }
 }
-

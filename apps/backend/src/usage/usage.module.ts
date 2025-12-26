@@ -17,4 +17,3 @@ import { PrismaService } from '../prisma.service';
   exports: [UsageMeterService],
 })
 export class UsageModule {}
-

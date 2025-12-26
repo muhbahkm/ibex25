@@ -152,4 +152,3 @@ export class InvoicesController {
     return this.invoicesService.cancel(invoiceId, operatorContext);
   }
 }
-

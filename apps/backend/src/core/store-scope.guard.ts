@@ -5,7 +5,6 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { getStoreIdFromRequest } from './tenant-boundary';
 
 /**
  * Store Scope Guard
@@ -101,7 +100,7 @@ export class StoreScopeGuard implements CanActivate {
    * @param request - Express request object
    * @returns storeId from AuthContext, or null if not available
    */
-  private extractStoreIdFromAuthContext(request: Request): string | null {
+  private extractStoreIdFromAuthContext(_request: Request): string | null {
     // TODO: Extract from AuthContext when auth system is implemented
     // For now, AuthContext is not available, so return null
     // Future implementation:
@@ -179,4 +178,3 @@ export class StoreScopeGuard implements CanActivate {
     return uuidRegex.test(uuid);
   }
 }
-

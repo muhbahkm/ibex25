@@ -20,4 +20,3 @@ export enum Role {
   CASHIER = 'CASHIER',
   AUDITOR = 'AUDITOR',
 }
-

@@ -72,4 +72,3 @@ export interface UsageSnapshot {
   metrics: UsageMetrics;
   computedAt: Date;
 }
-

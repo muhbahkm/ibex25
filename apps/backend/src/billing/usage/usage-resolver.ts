@@ -20,10 +20,21 @@ export class UsageResolver {
    * @param storeId - Store ID to compute usage for
    * @returns Current usage metrics
    */
-  static async resolve(prisma: PrismaService, storeId: string): Promise<PlanUsage> {
+  static async resolve(
+    prisma: PrismaService,
+    storeId: string,
+  ): Promise<PlanUsage> {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const endOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
 
     // Count invoices issued this month
     const invoicesThisMonth = await prisma.invoice.count({
@@ -52,4 +63,3 @@ export class UsageResolver {
     };
   }
 }
-

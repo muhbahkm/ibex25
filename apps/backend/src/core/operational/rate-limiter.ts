@@ -16,7 +16,10 @@ interface RateLimitEntry {
 type EndpointCategory = 'read' | 'write';
 
 export class RateLimiter {
-  private readonly storeLimits: Map<string, Map<EndpointCategory, RateLimitEntry>> = new Map();
+  private readonly storeLimits: Map<
+    string,
+    Map<EndpointCategory, RateLimitEntry>
+  > = new Map();
   private readonly readLimit: number;
   private readonly writeLimit: number;
   private readonly windowMs: number;
@@ -42,7 +45,6 @@ export class RateLimiter {
 
     if (!entry || now >= entry.resetAt) {
       // Reset window
-      const limit = category === 'read' ? this.readLimit : this.writeLimit;
       storeLimits.set(category, {
         count: 1,
         resetAt: now + this.windowMs,
@@ -111,11 +113,12 @@ export class RateLimiter {
     }
   }
 
-  private getOrCreateStoreLimits(storeId: string): Map<EndpointCategory, RateLimitEntry> {
+  private getOrCreateStoreLimits(
+    storeId: string,
+  ): Map<EndpointCategory, RateLimitEntry> {
     if (!this.storeLimits.has(storeId)) {
       this.storeLimits.set(storeId, new Map());
     }
     return this.storeLimits.get(storeId)!;
   }
 }
-

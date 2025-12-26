@@ -14,7 +14,12 @@ import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { OperatorContextDto } from './dto/operator-context.dto';
 import { IssueInvoiceDto } from './dto/issue-invoice.dto';
-import { Prisma, InvoiceStatus, PaymentType, LedgerEntryType } from '@prisma/client';
+import {
+  Prisma,
+  InvoiceStatus,
+  PaymentType,
+  LedgerEntryType,
+} from '@prisma/client';
 import { InvoiceStateTransitions } from './utils/invoice-state-transitions';
 import { StoreOwnershipGuard } from './utils/store-ownership.guard';
 import { LedgerGuard } from './utils/ledger-guard';
@@ -58,7 +63,8 @@ export class InvoicesService {
       );
 
       throw new ForbiddenException({
-        message: `Operation '${operation}' on invoice ${invoiceId} is forbidden. ` +
+        message:
+          `Operation '${operation}' on invoice ${invoiceId} is forbidden. ` +
           `Cross-tenant access denied. Operator storeId=${operatorStoreId}, Invoice storeId=${invoiceStoreId}.`,
         code: 'INVOICE_CROSS_TENANT_ACCESS',
       });
@@ -498,7 +504,9 @@ export class InvoicesService {
       for (const [productId, totalQuantity] of productQuantities.entries()) {
         const item = invoice.items.find((i) => i.productId === productId);
         if (!item) {
-          throw new NotFoundException(`Product not found in invoice: ${productId}`);
+          throw new NotFoundException(
+            `Product not found in invoice: ${productId}`,
+          );
         }
 
         const product = item.product;
@@ -612,9 +620,9 @@ export class InvoicesService {
         },
       });
 
-    if (!invoice) {
-      throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
-    }
+      if (!invoice) {
+        throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
+      }
 
       // S3: Enforce store ownership at service layer (defense in depth)
       // This validation runs even if StoreScopeGuard is bypassed
@@ -779,4 +787,3 @@ export class InvoicesService {
     };
   }
 }
-

@@ -1,6 +1,5 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { StoreOwnershipGuard } from '../invoices/utils/store-ownership.guard';
 
 /**
  * Ledger Service
@@ -38,11 +37,7 @@ export class LedgerService {
    * - No calculations, totals, or balances
    * - No pagination
    */
-  async findAll(
-    operatorStoreId: string,
-    fromDate?: string,
-    toDate?: string,
-  ) {
+  async findAll(operatorStoreId: string, fromDate?: string, toDate?: string) {
     // Store ownership is enforced at the service level
     // All ledger entries must belong to the operator's store
 
@@ -109,7 +104,9 @@ export class LedgerService {
    * - No grouping
    * - No formatting beyond plain values
    */
-  generateCSV(entries: Array<{ type: string; amount: number; createdAt: string }>): string {
+  generateCSV(
+    entries: Array<{ type: string; amount: number; createdAt: string }>,
+  ): string {
     // CSV header
     const header = 'Date,Type,Amount\n';
 
@@ -121,7 +118,11 @@ export class LedgerService {
 
       // Escape CSV values (handle commas, quotes, newlines)
       const escapeCSV = (value: string): string => {
-        if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+        if (
+          value.includes(',') ||
+          value.includes('"') ||
+          value.includes('\n')
+        ) {
           return `"${value.replace(/"/g, '""')}"`;
         }
         return value;
@@ -133,4 +134,3 @@ export class LedgerService {
     return header + rows.join('\n');
   }
 }
-

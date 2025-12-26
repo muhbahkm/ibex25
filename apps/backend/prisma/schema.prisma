@@ -201,20 +201,6 @@ enum BillingProvider {
   NONE
 }
 
-// Plan Model - B1: Subscription plan definitions (FOUNDATION ONLY: No pricing, no billing cycles)
-model Plan {
-  id          String              @id @default(uuid())
-  code        String              @unique
-  name        String
-  description String?
-  limits      Json                // e.g. { invoicesPerMonth: 500, users: 3 }
-  features    Json                // e.g. { ledger: true, reports: true }
-  createdAt   DateTime            @default(now())
-  subscriptions StoreSubscription[]
-  pricing     PlanPricing[]
-
-  @@map("plans")
-}
 
 // PlanPricing Model - B2: Pricing definitions for plans (READ-ONLY, no enforcement)
 model PlanPricing {

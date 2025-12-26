@@ -1,5 +1,4 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
-import { AuthContext } from './auth-context.interface';
 
 /**
  * Auth Guard (Stub Implementation)
@@ -31,19 +30,19 @@ import { AuthContext } from './auth-context.interface';
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  canActivate(_context: ExecutionContext): boolean {
     // FUTURE: Extract AuthContext from request
     // const request = context.switchToHttp().getRequest();
     // const authContext: AuthContext = this.extractAuthContext(request);
-    
+
     // FUTURE: Validate AuthContext
     // if (!authContext) {
     //   throw new UnauthorizedException('Authentication required');
     // }
-    
+
     // FUTURE: Attach AuthContext to request
     // request.authContext = authContext;
-    
+
     // CURRENT: Always allow (no enforcement yet)
     return true;
   }
@@ -55,4 +54,3 @@ export class AuthGuard implements CanActivate {
   //   return this.validateAndDecodeToken(token);
   // }
 }
-

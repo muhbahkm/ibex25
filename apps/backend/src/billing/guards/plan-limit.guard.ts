@@ -45,7 +45,8 @@ export class PlanLimitGuard implements CanActivate {
 
     try {
       // Get store's subscription
-      const subscription = await this.subscriptionsService.getByStoreId(storeId);
+      const subscription =
+        await this.subscriptionsService.getByStoreId(storeId);
 
       // Get plan limits
       const limits = subscription.plan.limits as PlanLimits;
@@ -107,4 +108,3 @@ export class PlanLimitGuard implements CanActivate {
     }
   }
 }
-

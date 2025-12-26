@@ -18,19 +18,12 @@ import { InvoiceStatus } from '@prisma/client';
  * - PAID → ISSUED
  * - CANCELLED → any state
  * - Any modification after ISSUED (except state transitions)
- *
- * ⚠️ CONTRACT FROZEN: This lifecycle is a core invariant.
- * Do not change state transitions without version bump.
- * This is constitutional law for the invoice domain.
  */
 export class InvoiceStateTransitions {
   /**
    * Check if a state transition is allowed
    */
-  static isTransitionAllowed(
-    from: InvoiceStatus,
-    to: InvoiceStatus,
-  ): boolean {
+  static isTransitionAllowed(from: InvoiceStatus, to: InvoiceStatus): boolean {
     // Same state is always allowed (no-op)
     if (from === to) {
       return true;
@@ -48,10 +41,7 @@ export class InvoiceStateTransitions {
 
     // Define allowed transitions
     const allowedTransitions: Record<InvoiceStatus, InvoiceStatus[]> = {
-      [InvoiceStatus.DRAFT]: [
-        InvoiceStatus.ISSUED,
-        InvoiceStatus.CANCELLED,
-      ],
+      [InvoiceStatus.DRAFT]: [InvoiceStatus.ISSUED, InvoiceStatus.CANCELLED],
       [InvoiceStatus.ISSUED]: [
         InvoiceStatus.UNPAID,
         InvoiceStatus.PAID,
@@ -108,9 +98,7 @@ export class InvoiceStateTransitions {
    * Check if an invoice can be cancelled (DRAFT or ISSUED can be cancelled)
    */
   static canCancel(status: InvoiceStatus): boolean {
-    return (
-      status === InvoiceStatus.DRAFT || status === InvoiceStatus.ISSUED
-    );
+    return status === InvoiceStatus.DRAFT || status === InvoiceStatus.ISSUED;
   }
 
   /**
@@ -118,9 +106,7 @@ export class InvoiceStateTransitions {
    * (Only UNPAID and PAID have financial impact)
    */
   static hasFinancialImpact(status: InvoiceStatus): boolean {
-    return (
-      status === InvoiceStatus.UNPAID || status === InvoiceStatus.PAID
-    );
+    return status === InvoiceStatus.UNPAID || status === InvoiceStatus.PAID;
   }
 
   /**
@@ -128,9 +114,6 @@ export class InvoiceStateTransitions {
    * (Only UNPAID and PAID appear in statements)
    */
   static appearsInStatement(status: InvoiceStatus): boolean {
-    return (
-      status === InvoiceStatus.UNPAID || status === InvoiceStatus.PAID
-    );
+    return status === InvoiceStatus.UNPAID || status === InvoiceStatus.PAID;
   }
 }
-

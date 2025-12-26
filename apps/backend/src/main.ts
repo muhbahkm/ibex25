@@ -9,22 +9,22 @@ async function bootstrap() {
   try {
     // Validate environment variables before starting
     validateEnvironment();
-    
+
     const app = await NestFactory.create(AppModule);
-    
+
     // Enable CORS for all origins (for development)
     app.enableCors({
       origin: true, // Allow all origins
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
     });
-    
+
     // Register global exception filter
     app.useGlobalFilters(new GlobalExceptionFilter());
-    
+
     // Register global success response interceptor
     app.useGlobalInterceptors(new SuccessResponseInterceptor());
-    
+
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -32,7 +32,7 @@ async function bootstrap() {
         transform: true,
       }),
     );
-    
+
     const port = process.env.PORT || 3000;
     await app.listen(port);
     console.log(`🚀 Application is running on: http://0.0.0.0:${port}`);
@@ -42,4 +42,3 @@ async function bootstrap() {
   }
 }
 bootstrap();
-

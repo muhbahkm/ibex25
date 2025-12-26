@@ -34,4 +34,3 @@ export class LedgerQueryDto extends OperatorContextDto {
   @IsIn(['csv'])
   export?: string;
 }
-

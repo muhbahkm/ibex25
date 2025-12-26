@@ -56,7 +56,9 @@ export class WriteThrottleGuard implements CanActivate {
     const storeOps = this.getOrCreateStoreOps(storeId);
 
     // Remove operations outside the window
-    const recentOps = storeOps.filter((timestamp) => now - timestamp < this.windowMs);
+    const recentOps = storeOps.filter(
+      (timestamp) => now - timestamp < this.windowMs,
+    );
 
     if (recentOps.length >= this.maxWriteOpsPerMinute) {
       const oldestOp = Math.min(...recentOps);
@@ -122,7 +124,9 @@ export class WriteThrottleGuard implements CanActivate {
   private cleanup(): void {
     const now = Date.now();
     for (const [storeId, ops] of this.writeOps.entries()) {
-      const recentOps = ops.filter((timestamp) => now - timestamp < this.windowMs);
+      const recentOps = ops.filter(
+        (timestamp) => now - timestamp < this.windowMs,
+      );
       if (recentOps.length === 0) {
         this.writeOps.delete(storeId);
       } else {
@@ -131,4 +135,3 @@ export class WriteThrottleGuard implements CanActivate {
     }
   }
 }
-

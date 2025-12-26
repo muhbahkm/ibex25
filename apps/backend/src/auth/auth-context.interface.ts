@@ -31,4 +31,3 @@ export interface AuthContext {
   role: Role;
   permissions: Permission[];
 }
-

@@ -74,7 +74,9 @@ export function validateEnvironment(): EnvironmentConfig {
     const invalidMessages = invalid.map(
       (item) => `${item.name}: ${item.reason}`,
     );
-    errors.push(`Invalid environment variables:\n  - ${invalidMessages.join('\n  - ')}`);
+    errors.push(
+      `Invalid environment variables:\n  - ${invalidMessages.join('\n  - ')}`,
+    );
   }
 
   if (errors.length > 0) {
@@ -113,4 +115,3 @@ export function getEnvironmentConfig(): EnvironmentConfig {
     NODE_ENV: process.env.NODE_ENV || OPTIONAL_ENV_VARS.NODE_ENV,
   };
 }
-

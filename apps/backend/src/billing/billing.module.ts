@@ -37,4 +37,3 @@ import { PrismaService } from '../prisma.service';
   ],
 })
 export class BillingModule {}
-

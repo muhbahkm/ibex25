@@ -32,4 +32,3 @@ export interface StorePlanDto {
   features: PlanFeatures;
   usage: PlanUsage;
 }
-

@@ -1,4 +1,4 @@
-import { IsEnum, IsUUID } from 'class-validator';
+import { IsEnum } from 'class-validator';
 import { PaymentType } from '@prisma/client';
 import { OperatorContextDto } from './operator-context.dto';
 
@@ -23,4 +23,3 @@ export class IssueInvoiceDto extends OperatorContextDto {
   })
   paymentType: PaymentType;
 }
-

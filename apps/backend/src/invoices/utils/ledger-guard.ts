@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { PrismaClient, LedgerEntryType } from '@prisma/client';
+import { PrismaClient, LedgerEntryType, Prisma } from '@prisma/client';
 
 /**
  * Ledger Guard Utility
@@ -28,7 +28,7 @@ export class LedgerGuard {
    * Throws if duplicate is found
    */
   static async ensureNoSaleEntry(
-    tx: PrismaClient,
+    tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>,
     invoiceId: string,
     invoiceStoreId: string,
   ): Promise<void> {
@@ -59,7 +59,7 @@ export class LedgerGuard {
    * Throws if duplicate is found
    */
   static async ensureNoReceiptEntry(
-    tx: PrismaClient,
+    tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>,
     invoiceId: string,
     invoiceStoreId: string,
   ): Promise<void> {
@@ -90,7 +90,7 @@ export class LedgerGuard {
    * This is a convenience method that checks both conditions
    */
   static async validateLedgerEntryCreation(
-    tx: PrismaClient,
+    tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>,
     invoiceId: string,
     invoiceStoreId: string,
     entryType: LedgerEntryType,
@@ -110,4 +110,3 @@ export class LedgerGuard {
     }
   }
 }
-

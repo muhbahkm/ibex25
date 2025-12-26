@@ -32,9 +32,12 @@ export class RateLimitGuard implements CanActivate {
     this.rateLimiter = new RateLimiter(readLimit, writeLimit, windowMs);
 
     // Cleanup old entries every 5 minutes
-    setInterval(() => {
-      this.rateLimiter.cleanup();
-    }, 5 * 60 * 1000);
+    setInterval(
+      () => {
+        this.rateLimiter.cleanup();
+      },
+      5 * 60 * 1000,
+    );
   }
 
   canActivate(context: ExecutionContext): boolean {
@@ -52,7 +55,6 @@ export class RateLimitGuard implements CanActivate {
 
     // Check rate limit
     if (!this.rateLimiter.isAllowed(storeId, category)) {
-      const remaining = this.rateLimiter.getRemaining(storeId, category);
       const resetTime = this.rateLimiter.getResetTime(storeId, category);
 
       this.logger.warn(
@@ -100,4 +102,3 @@ export class RateLimitGuard implements CanActivate {
     return 'read';
   }
 }
-

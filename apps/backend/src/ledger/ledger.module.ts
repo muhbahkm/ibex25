@@ -10,4 +10,3 @@ import { OperationalModule } from '../core/operational/operational.module';
   providers: [LedgerService, PrismaService],
 })
 export class LedgerModule {}
-

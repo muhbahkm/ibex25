@@ -6,4 +6,3 @@ export class AppService {
     return 'IBEX API is running';
   }
 }
-

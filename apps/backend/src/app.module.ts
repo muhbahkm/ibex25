@@ -10,7 +10,13 @@ import { PrismaService } from './prisma.service';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
-  imports: [InvoicesModule, CustomersModule, LedgerModule, BillingModule, UsageModule],
+  imports: [
+    InvoicesModule,
+    CustomersModule,
+    LedgerModule,
+    BillingModule,
+    UsageModule,
+  ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
 })
@@ -20,4 +26,3 @@ export class AppModule implements NestModule {
     consumer.apply(RequestIdMiddleware).forRoutes('*');
   }
 }
-

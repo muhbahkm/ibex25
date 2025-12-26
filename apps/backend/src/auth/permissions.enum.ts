@@ -18,9 +18,8 @@ export enum Permission {
   ISSUE_INVOICE = 'ISSUE_INVOICE',
   SETTLE_INVOICE = 'SETTLE_INVOICE',
   CANCEL_INVOICE = 'CANCEL_INVOICE',
-  
+
   // View Operations
   VIEW_LEDGER = 'VIEW_LEDGER',
   VIEW_REPORTS = 'VIEW_REPORTS',
 }
-

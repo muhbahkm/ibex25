@@ -11,4 +11,3 @@ import { OperationalModule } from '../core/operational/operational.module';
   providers: [InvoicesService, PrismaService],
 })
 export class InvoicesModule {}
-

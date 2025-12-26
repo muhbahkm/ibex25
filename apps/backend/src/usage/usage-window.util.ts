@@ -21,7 +21,9 @@ export interface WindowBoundaries {
  * @param referenceDate - Reference date (defaults to now, but injectable for testing)
  * @returns Window boundaries for the current day
  */
-export function getDailyWindow(referenceDate: Date = new Date()): WindowBoundaries {
+export function getDailyWindow(
+  referenceDate: Date = new Date(),
+): WindowBoundaries {
   const start = new Date(
     referenceDate.getFullYear(),
     referenceDate.getMonth(),
@@ -51,7 +53,9 @@ export function getDailyWindow(referenceDate: Date = new Date()): WindowBoundari
  * @param referenceDate - Reference date (defaults to now, but injectable for testing)
  * @returns Window boundaries for the current month
  */
-export function getMonthlyWindow(referenceDate: Date = new Date()): WindowBoundaries {
+export function getMonthlyWindow(
+  referenceDate: Date = new Date(),
+): WindowBoundaries {
   const start = new Date(
     referenceDate.getFullYear(),
     referenceDate.getMonth(),
@@ -95,4 +99,3 @@ export function getWindowBoundaries(
       throw new Error(`Unknown time window: ${window}`);
   }
 }
-

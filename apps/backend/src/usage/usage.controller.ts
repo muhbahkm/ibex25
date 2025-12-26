@@ -1,4 +1,11 @@
-import { Controller, Get, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  UseGuards,
+  Req,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { UsageMeterService } from './usage-meter.service';
 import { TimeWindow, UsageSnapshot } from './usage-metrics.types';
@@ -56,7 +63,10 @@ export class UsageController {
     const timeWindow = this.parseWindow(window);
 
     // Get usage snapshot
-    const snapshot = await this.usageMeterService.getUsageSnapshot(storeId, timeWindow);
+    const snapshot = await this.usageMeterService.getUsageSnapshot(
+      storeId,
+      timeWindow,
+    );
 
     return {
       success: true,
@@ -85,4 +95,3 @@ export class UsageController {
     return TimeWindow.MONTHLY;
   }
 }
-
