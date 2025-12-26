@@ -278,6 +278,269 @@ export async function fetchLedgerEntries(
   return body.data
 }
 
+// Products API
+export interface Product {
+  id: string
+  name: string
+  price: string
+}
+
+interface ProductsResponse {
+  success: boolean
+  data?: Product[]
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchProducts(
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<Product[]> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/products`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    throw new Error('تعذر جلب قائمة المنتجات من الخادم.')
+  }
+
+  const body = (await res.json()) as ProductsResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب قائمة المنتجات.'
+    throw new Error(message)
+  }
+
+  return body.data
+}
+
+// Invoice Detail API
+export interface InvoiceDetail {
+  id: string
+  customerId: string | null
+  customerName: string | null
+  status: 'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED'
+  totalAmount: string
+  createdAt: string
+  items: Array<{
+    id: string
+    productId: string
+    productName: string
+    quantity: number
+    unitPrice: string
+  }>
+}
+
+interface InvoiceDetailResponse {
+  success: boolean
+  data?: InvoiceDetail
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchInvoice(
+  invoiceId: string,
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<InvoiceDetail> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/invoices/${invoiceId}`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    throw new Error('تعذر جلب بيانات الفاتورة من الخادم.')
+  }
+
+  const body = (await res.json()) as InvoiceDetailResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب بيانات الفاتورة.'
+    throw new Error(message)
+  }
+
+  return body.data
+}
+
+// Create Invoice API
+interface CreateInvoiceRequest {
+  storeId: string
+  createdBy: string
+  customerId: string | null
+  items: Array<{
+    productId: string
+    quantity: number
+  }>
+  operatorContext: {
+    operatorId: string
+    storeId: string
+  }
+}
+
+interface CreateInvoiceResponse {
+  success: boolean
+  data?: {
+    id: string
+    status: string
+    [key: string]: unknown
+  }
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function createInvoice(
+  customerId: string | null,
+  items: Array<{ productId: string; quantity: number }>,
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<string> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/invoices`
+
+  const body: CreateInvoiceRequest = {
+    storeId,
+    createdBy: userId,
+    customerId,
+    items,
+    operatorContext: {
+      operatorId: userId,
+      storeId,
+    },
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    const errorBody = (await res.json()) as CreateInvoiceResponse
+    const message = errorBody.error?.message || 'فشل إنشاء الفاتورة.'
+    throw new Error(message)
+  }
+
+  const responseBody = (await res.json()) as CreateInvoiceResponse
+
+  if (!responseBody.success || !responseBody.data) {
+    const message = responseBody.error?.message || 'فشل إنشاء الفاتورة.'
+    throw new Error(message)
+  }
+
+  return responseBody.data.id
+}
+
+// Update Invoice Draft API
+interface UpdateInvoiceDraftRequest {
+  customerId?: string | null
+  items?: Array<{
+    productId: string
+    quantity: number
+  }>
+  operatorContext: {
+    operatorId: string
+    storeId: string
+  }
+}
+
+interface UpdateInvoiceDraftResponse {
+  success: boolean
+  data?: {
+    id: string
+    [key: string]: unknown
+  }
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function updateInvoiceDraft(
+  invoiceId: string,
+  customerId: string | null | undefined,
+  items: Array<{ productId: string; quantity: number }> | undefined,
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<void> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/invoices/${invoiceId}/draft`
+
+  const body: UpdateInvoiceDraftRequest = {
+    operatorContext: {
+      operatorId: userId,
+      storeId,
+    },
+  }
+
+  if (customerId !== undefined) {
+    body.customerId = customerId
+  }
+
+  if (items !== undefined) {
+    body.items = items
+  }
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    const errorBody = (await res.json()) as UpdateInvoiceDraftResponse
+    const message = errorBody.error?.message || 'فشل تحديث الفاتورة.'
+    throw new Error(message)
+  }
+
+  const responseBody = (await res.json()) as UpdateInvoiceDraftResponse
+
+  if (!responseBody.success) {
+    const message = responseBody.error?.message || 'فشل تحديث الفاتورة.'
+    throw new Error(message)
+  }
+}
+
 // B1: Billing API
 export interface StorePlan {
   plan: {
