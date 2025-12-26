@@ -390,7 +390,7 @@ This logging includes:
 ---
 
 **Last Updated:** 2025-12-25  
-**Phase:** B3 - Internal Billing Control Layer (Provider-Agnostic)
+**Phase:** C2 - Usage Metering (Read-only, Accurate)
 
 ---
 
@@ -678,4 +678,92 @@ B3 respects all frozen contracts:
 - ✅ No multi-tenant isolation breaks
 - ✅ No accounting logic modifications
 - ✅ No writes to accounting tables
+
+---
+
+## Usage Metering (C2)
+
+### Overview
+
+Phase C2 introduces a read-only usage metering layer that provides accurate usage metrics computed on demand. This is the **SINGLE SOURCE OF TRUTH** for usage data.
+
+### What C2 Provides
+
+- **UsageMeterService**: Read-only service that computes usage metrics
+- **Usage Metrics**: invoicesIssued, ledgerEntries, activeInvoices, activeCustomers
+- **Time Windows**: DAILY, MONTHLY
+- **GET /usage API**: Read-only endpoint for usage metrics
+- **Pure Computation**: Metrics derived from existing data only
+
+### What C2 Does NOT Provide
+
+- ❌ No storage of usage data
+- ❌ No caching of usage results
+- ❌ No billing enforcement
+- ❌ No write operations
+- ❌ No background jobs
+- ❌ No time-series tracking
+
+### Why This Precedes Stripe
+
+Usage metering must be accurate before implementing billing:
+
+1. **Foundation First**: Accurate usage metrics are required for billing calculations
+2. **Validation**: Need to verify usage computation before billing logic
+3. **Separation of Concerns**: Usage is observational, billing is transactional
+4. **Testing**: Can test usage accuracy independently of payment processing
+
+### Why Enforcement is NOT Done Here
+
+C2 is **observational only**:
+
+- Usage metrics show what happened
+- They do not prevent operations
+- They do not trigger billing
+- They do not enforce limits
+
+**Enforcement** happens in:
+- **B1**: Plan limits (soft enforcement)
+- **B3**: Billing status (hard enforcement)
+- **C1**: Rate limiting and throttling (operational safety)
+
+### How This Supports Future Billing Safely
+
+Usage metrics provide the foundation for:
+
+1. **Usage-Based Billing**: Accurate metrics enable per-unit billing
+2. **Plan Enforcement**: Compare usage to plan limits
+3. **Reporting**: Show customers their usage patterns
+4. **Analytics**: Understand usage trends
+
+**Safety Guarantees:**
+- Read-only (no data mutations)
+- Computed on demand (always accurate)
+- Store-scoped (tenant-safe)
+- Deterministic (same input = same output)
+
+### Metric Definitions
+
+**invoicesIssued**: Count of invoices (ISSUED, UNPAID, PAID) created within time window  
+**ledgerEntries**: Count of ledger entries created within time window  
+**activeInvoices**: Current count of active invoices (not time-windowed)  
+**activeCustomers**: Current count of active customers with invoices (not time-windowed)
+
+### API Endpoint
+
+**GET /usage**
+- Query: `window=daily|monthly` (default: monthly)
+- Returns: Usage snapshot with metrics
+- Security: StoreScopeGuard enforced
+
+### Contract Safety
+
+C2 respects all frozen contracts:
+- ✅ No schema changes
+- ✅ No migrations
+- ✅ No invoice lifecycle changes
+- ✅ No ledger invariant changes
+- ✅ No billing logic
+- ✅ Read-only only
+- ✅ Store-scoped (tenant-safe)
 
