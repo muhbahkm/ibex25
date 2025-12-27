@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { RequirePermission } from '@/auth/RequirePermission'
 import { Permission } from '@/auth/roles'
 import { useAuth } from '@/auth/useAuth'
-import { fetchInvoice, settleInvoice, InvoiceDetail } from '@/lib/api'
+import { fetchInvoice, settleInvoice, cancelInvoice, InvoiceDetail } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/format'
 import {
   Button,
@@ -21,6 +21,23 @@ import {
   ErrorMessage,
 } from '@/components/ui'
 import Icon from '@/components/Icon'
+
+function getStatusDescription(status: string): string {
+  switch (status) {
+    case 'DRAFT':
+      return 'مسودة: يمكنك التعديل عليها. لم تؤثر على السجل المالي بعد.'
+    case 'ISSUED':
+      return 'مصدرة: تم تثبيت البيع في السجل المالي.'
+    case 'UNPAID':
+      return 'غير مدفوعة: تم تسجيل البيع، بانتظار التحصيل.'
+    case 'PAID':
+      return 'مدفوعة: تم تحصيل المبلغ وتسجيله.'
+    case 'CANCELLED':
+      return 'ملغاة: تم إيقاف الفاتورة وعكس أثرها المالي.'
+    default:
+      return ''
+  }
+}
 
 /**
  * Get Arabic label for payment type
@@ -38,6 +55,7 @@ export default function InvoiceDetailsPage() {
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isSettling, setIsSettling] = useState<boolean>(false)
+  const [isCancelling, setIsCancelling] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -60,9 +78,9 @@ export default function InvoiceDetailsPage() {
         setInvoice(invoiceData)
       } catch (err) {
         if (!isMounted) return
-        const message =
-          err instanceof Error ? err.message : 'فشل تحميل بيانات الفاتورة.'
-        setError(message)
+      const message =
+        err instanceof Error ? err.message : 'تعذر تحميل بيانات الفاتورة'
+      setError(message)
       } finally {
         if (isMounted) {
           setIsLoading(false)
@@ -94,12 +112,50 @@ export default function InvoiceDetailsPage() {
         user.role,
       )
       setInvoice(updatedInvoice)
+      setError(null)
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'فشل تسوية الفاتورة.'
+        err instanceof Error ? err.message : 'تعذر تسوية الفاتورة'
       setError(message)
     } finally {
       setIsSettling(false)
+    }
+  }
+
+  const handleCancel = async () => {
+    if (!invoice) return
+
+    // Confirm cancellation
+    const confirmed = window.confirm(
+      '⚠️ هل أنت متأكد من إلغاء هذه الفاتورة؟\n\n' +
+      '• هذا الإجراء نهائي ولا يمكن التراجع عنه.\n' +
+      '• سيتم تحديث السجل المالي تلقائياً لعكس العملية.\n' +
+      '• ستتغير حالة الفاتورة إلى "ملغاة".\n\n' +
+      'هل تريد المتابعة؟'
+    )
+
+    if (!confirmed) return
+
+    try {
+      setIsCancelling(true)
+      setError(null)
+
+      await cancelInvoice(invoiceId, user.id, user.storeId, user.role)
+
+      // Reload invoice after successful cancellation
+      const updatedInvoice = await fetchInvoice(
+        invoiceId,
+        user.id,
+        user.storeId,
+        user.role,
+      )
+      setInvoice(updatedInvoice)
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'تعذر إلغاء الفاتورة'
+      setError(message)
+    } finally {
+      setIsCancelling(false)
     }
   }
 
@@ -141,7 +197,10 @@ export default function InvoiceDetailsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-page-title mb-1">تفاصيل الفاتورة</h1>
-            <p className="text-muted">رقم الفاتورة: {invoice.id}</p>
+            <p className="text-muted hidden sm:block mb-1">
+              عرض كامل تفاصيل الفاتورة وحالتها الحالية
+            </p>
+            <p className="text-body font-medium text-gray-900">رقم الفاتورة: {invoice.id}</p>
           </div>
           <Link
             href="/invoices"
@@ -164,7 +223,12 @@ export default function InvoiceDetailsPage() {
                 <label className="block text-xs font-medium text-gray-500 mb-1">
                   الحالة
                 </label>
-                <StatusBadge status={invoice.status} />
+                <div className="flex flex-col gap-1">
+                  <StatusBadge status={invoice.status} />
+                  <span className="text-xs text-gray-500 max-w-xs">
+                    {getStatusDescription(invoice.status)}
+                  </span>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -250,25 +314,70 @@ export default function InvoiceDetailsPage() {
           {/* Actions */}
           <div className="p-6 flex justify-end gap-3">
             {invoice.status === 'DRAFT' && (
-              <Link href={`/invoices/${invoiceId}/edit`}>
-                <Button variant="primary" size="md" className="gap-2">
-                  <Icon name="edit" />
-                  <span>تعديل</span>
-                </Button>
-              </Link>
+              <>
+                <Link href={`/invoices/${invoiceId}/edit`}>
+                  <Button variant="primary" size="md" className="gap-2">
+                    <Icon name="edit" />
+                    <span>تعديل</span>
+                  </Button>
+                </Link>
+                <RequirePermission permission={Permission.CANCEL_INVOICE}>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={handleCancel}
+                    disabled={isCancelling}
+                    isLoading={isCancelling}
+                    className="gap-2"
+                  >
+                    {!isCancelling && <Icon name="cancel" />}
+                    <span>إلغاء الفاتورة</span>
+                  </Button>
+                </RequirePermission>
+              </>
             )}
             {invoice.status === 'UNPAID' && (
-              <RequirePermission permission={Permission.SETTLE_INVOICE}>
+              <>
+                <RequirePermission permission={Permission.SETTLE_INVOICE}>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={handleSettle}
+                    disabled={isSettling}
+                    isLoading={isSettling}
+                    className="gap-2"
+                  >
+                    {!isSettling && <Icon name="check_circle" />}
+                    <span>تسوية الفاتورة</span>
+                  </Button>
+                </RequirePermission>
+                <RequirePermission permission={Permission.CANCEL_INVOICE}>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={handleCancel}
+                    disabled={isCancelling}
+                    isLoading={isCancelling}
+                    className="gap-2"
+                  >
+                    {!isCancelling && <Icon name="cancel" />}
+                    <span>إلغاء الفاتورة</span>
+                  </Button>
+                </RequirePermission>
+              </>
+            )}
+            {(invoice.status === 'ISSUED' || invoice.status === 'PAID') && (
+              <RequirePermission permission={Permission.CANCEL_INVOICE}>
                 <Button
-                  variant="primary"
+                  variant="secondary"
                   size="md"
-                  onClick={handleSettle}
-                  disabled={isSettling}
-                  isLoading={isSettling}
+                  onClick={handleCancel}
+                  disabled={isCancelling}
+                  isLoading={isCancelling}
                   className="gap-2"
                 >
-                  {!isSettling && <Icon name="check_circle" />}
-                  <span>تسوية الفاتورة</span>
+                  {!isCancelling && <Icon name="cancel" />}
+                  <span>إلغاء الفاتورة</span>
                 </Button>
               </RequirePermission>
             )}

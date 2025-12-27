@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 import { RequirePermission } from '@/auth/RequirePermission'
 import { Permission } from '@/auth/roles'
 import { useAuth } from '@/auth/useAuth'
@@ -98,8 +99,8 @@ export default function IssueInvoicePage() {
         user.role,
       )
 
-      // Redirect to invoice list after success
-      router.push('/invoices')
+      // Redirect to invoice detail page to show success
+      router.push(`/invoices/${invoiceId}`)
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'فشل إصدار الفاتورة.'
@@ -170,9 +171,18 @@ export default function IssueInvoicePage() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Page Header */}
         <div>
+          <div className="mb-3">
+            <Link
+              href={`/invoices/${invoiceId}/edit`}
+              className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors mb-2"
+            >
+              <Icon name="arrow_back" className="text-base" />
+              <span>العودة إلى التعديل</span>
+            </Link>
+          </div>
           <h1 className="text-page-title mb-2">إصدار الفاتورة</h1>
-          <div className="flex items-center gap-4">
-            <p className="text-muted">الفاتورة #{invoice.id}</p>
+          <div className="flex flex-wrap items-center gap-4">
+            <p className="text-muted">الفاتورة #{invoice.id.substring(0, 8)}...</p>
             <StatusBadge status={invoice.status} />
           </div>
         </div>
@@ -186,11 +196,10 @@ export default function IssueInvoicePage() {
             <Icon name="warning" className="text-danger-600 text-xl flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-body font-semibold text-danger-900 mb-1">
-                تحذير: إجراء نهائي
+                تنبيه هام: إصدار الفاتورة
               </p>
               <p className="text-body text-danger-800">
-                إصدار هذه الفاتورة سيؤدي إلى قفلها بشكل دائم. لن يمكن تعديلها أو حذفها بعد الإصدار. 
-                سيتم خصم المخزون وإنشاء سجل مالي. تأكد من صحة جميع البيانات قبل المتابعة.
+                إصدار الفاتورة يعني تثبيت عملية البيع في السجلات المالية وخصم المخزون. بعد الإصدار، لا يمكن تعديل الفاتورة ولكن يمكن إلغاؤها عند الضرورة. يرجى التأكد من صحة البيانات.
               </p>
             </div>
           </div>
@@ -310,7 +319,7 @@ export default function IssueInvoicePage() {
               className="gap-2"
             >
               {!isIssuing && <Icon name="check_circle" />}
-              <span>تأكيد الإصدار</span>
+              <span>إصدار الفاتورة</span>
             </Button>
           </div>
         </div>

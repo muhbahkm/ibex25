@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { RequirePermission } from '@/auth/RequirePermission'
 import { Permission } from '@/auth/roles'
 import { useAuth } from '@/auth/useAuth'
@@ -55,6 +56,8 @@ export default function LedgerPage() {
       const ledgerEntries = await fetchLedgerEntries(
         user.storeId,
         user.id,
+        user.id,
+        user.role,
         fromDateISO,
         toDateISO,
       )
@@ -66,7 +69,7 @@ export default function LedgerPage() {
       if (!isMounted) return
 
       const message =
-        err instanceof Error ? err.message : 'فشل تحميل بيانات السجل المالي.'
+        err instanceof Error ? err.message : 'تعذر تحميل السجل المالي'
       setError(message)
     } finally {
       if (isMounted) {
@@ -129,6 +132,9 @@ export default function LedgerPage() {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'x-user-id': user.id,
+          'x-store-id': user.storeId,
+          'x-role': user.role,
         },
         cache: 'no-store',
       })
@@ -153,7 +159,7 @@ export default function LedgerPage() {
       URL.revokeObjectURL(urlBlob)
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'فشل تصدير بيانات السجل المالي.'
+        err instanceof Error ? err.message : 'تعذر تصدير السجل المالي'
       setError(message)
     }
   }
@@ -162,12 +168,31 @@ export default function LedgerPage() {
     <RequirePermission permission={Permission.VIEW_LEDGER}>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Page Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-page-title mb-2">سجل الحركات المالية</h1>
-            <p className="text-muted">
-              عرض جميع الحركات المالية (مبيعات و تحصيلات) في المتجر
+            <h1 className="text-page-title mb-2">السجل المالي</h1>
+            <p className="text-muted hidden sm:block">
+              سجل مالي موثق لجميع عمليات البيع والتحصيل (غير قابل للتعديل)
             </p>
+          </div>
+        </div>
+
+        {/* Info Card */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Icon name="info" className="text-blue-600 text-xl flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-blue-900">
+                كيف يعمل السجل المالي؟
+              </p>
+              <p className="text-sm text-blue-800 leading-relaxed">
+                هذا السجل آلي بالكامل ولا يقبل التعديل اليدوي لضمان الموثوقية.
+                <br />
+                • <strong>بيع (SALE):</strong> يسجل عند إصدار أي فاتورة جديدة.
+                <br />
+                • <strong>تحصيل (RECEIPT):</strong> يسجل عند استلام المبلغ (نقدي أو تسوية).
+              </p>
+            </div>
           </div>
         </div>
 
@@ -176,7 +201,7 @@ export default function LedgerPage() {
 
         {/* Filters and Actions */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <form onSubmit={handleFilter} className="flex flex-wrap items-end gap-4">
+          <form onSubmit={handleFilter} className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-end gap-4">
             <div className="flex-1 min-w-[200px]">
               <label
                 htmlFor="fromDate"
@@ -207,14 +232,14 @@ export default function LedgerPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-body"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <Button
                 type="submit"
                 variant="primary"
                 size="md"
                 disabled={isLoading}
                 isLoading={isLoading}
-                className="gap-2"
+                className="gap-2 w-full sm:w-auto"
               >
                 {!isLoading && <Icon name="filter_list" />}
                 <span>تصفية</span>
@@ -226,7 +251,7 @@ export default function LedgerPage() {
                   size="md"
                   onClick={handleClearFilters}
                   disabled={isLoading}
-                  className="gap-2"
+                  className="gap-2 w-full sm:w-auto"
                 >
                   <Icon name="clear" />
                   <span>مسح</span>
@@ -238,7 +263,7 @@ export default function LedgerPage() {
                 size="md"
                 onClick={handleExportCSV}
                 disabled={isLoading}
-                className="gap-2"
+                className="gap-2 w-full sm:w-auto"
               >
                 <Icon name="download" />
                 <span>تصدير CSV</span>
@@ -268,7 +293,17 @@ export default function LedgerPage() {
                     description={
                       fromDate || toDate
                         ? 'لا توجد حركات مالية في الفترة المحددة'
-                        : 'لم يتم تسجيل أي حركات مالية حتى الآن'
+                        : 'يتم إنشاء القيود تلقائياً عند إصدار الفواتير. ابدأ بإنشاء فاتورة لرؤية الأثر المالي.'
+                    }
+                    action={
+                      !fromDate && !toDate && (
+                        <Link href="/invoices/new">
+                          <Button variant="primary" size="md" className="gap-2">
+                            <Icon name="add" />
+                            <span>إنشاء فاتورة جديدة</span>
+                          </Button>
+                        </Link>
+                      )
                     }
                   />
                 </TableCell>

@@ -1,3 +1,5 @@
+import { handleApiError, extractErrorMessage } from './error-handler'
+
 export interface CustomerSummary {
   id: string
   name: string
@@ -66,7 +68,7 @@ export async function fetchCustomers(): Promise<CustomerSummary[]> {
   })
 
   if (!res.ok) {
-    throw new Error('تعذر جلب قائمة العملاء من الخادم.')
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as CustomersResponse
@@ -94,7 +96,7 @@ export async function fetchCustomerStatement(
   })
 
   if (!res.ok) {
-    throw new Error('تعذر جلب بيانات العميل من الخادم.')
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as StatementResponse
@@ -104,7 +106,7 @@ export async function fetchCustomerStatement(
     throw new Error(message)
   }
 
-  return body.data
+  return body.data as CustomerStatement
 }
 
 interface SettleResponse {
@@ -148,9 +150,7 @@ export async function settleInvoice(
   })
 
   if (!res.ok) {
-    const body = (await res.json()) as SettleResponse
-    const message = body.error?.message || 'فشل تسوية الفاتورة.'
-    throw new Error(message)
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as SettleResponse
@@ -198,7 +198,7 @@ export async function fetchInvoices(
   })
 
   if (!res.ok) {
-    throw new Error('تعذر جلب قائمة الفواتير من الخادم.')
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as InvoicesResponse
@@ -230,6 +230,8 @@ interface LedgerResponse {
 export async function fetchLedgerEntries(
   storeId: string,
   operatorId: string,
+  userId: string,
+  role: string,
   fromDate?: string,
   toDate?: string,
 ): Promise<LedgerEntry[]> {
@@ -253,12 +255,15 @@ export async function fetchLedgerEntries(
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
     },
     cache: 'no-store',
   })
 
   if (!res.ok) {
-    throw new Error('تعذر جلب بيانات السجل المالي من الخادم.')
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as LedgerResponse | LedgerEntry[]
@@ -297,6 +302,8 @@ interface ProfitLossResponse {
 export async function fetchProfitLossReport(
   storeId: string,
   operatorId: string,
+  userId: string,
+  role: string,
   fromDate?: string,
   toDate?: string,
 ): Promise<ProfitLossReport> {
@@ -320,12 +327,15 @@ export async function fetchProfitLossReport(
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
     },
     cache: 'no-store',
   })
 
   if (!res.ok) {
-    throw new Error('تعذر جلب بيانات التقرير من الخادم.')
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as ProfitLossResponse
@@ -336,6 +346,15 @@ export async function fetchProfitLossReport(
   }
 
   return body.data
+}
+
+// Helper function to get auth headers from user context
+export function getAuthHeaders(userId: string, storeId: string, role: string) {
+  return {
+    'x-user-id': userId,
+    'x-store-id': storeId,
+    'x-role': role,
+  }
 }
 
 // Products API
@@ -374,7 +393,7 @@ export async function fetchProducts(
   })
 
   if (!res.ok) {
-    throw new Error('تعذر جلب قائمة المنتجات من الخادم.')
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as ProductsResponse
@@ -435,7 +454,7 @@ export async function fetchInvoice(
   })
 
   if (!res.ok) {
-    throw new Error('تعذر جلب بيانات الفاتورة من الخادم.')
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as InvoiceDetailResponse
@@ -510,9 +529,7 @@ export async function createInvoice(
   })
 
   if (!res.ok) {
-    const errorBody = (await res.json()) as CreateInvoiceResponse
-    const message = errorBody.error?.message || 'فشل إنشاء الفاتورة.'
-    throw new Error(message)
+    await handleApiError(res)
   }
 
   const responseBody = (await res.json()) as CreateInvoiceResponse
@@ -589,9 +606,7 @@ export async function updateInvoiceDraft(
   })
 
   if (!res.ok) {
-    const errorBody = (await res.json()) as UpdateInvoiceDraftResponse
-    const message = errorBody.error?.message || 'فشل تحديث الفاتورة.'
-    throw new Error(message)
+    await handleApiError(res)
   }
 
   const responseBody = (await res.json()) as UpdateInvoiceDraftResponse
@@ -654,15 +669,74 @@ export async function issueInvoice(
   })
 
   if (!res.ok) {
-    const errorBody = (await res.json()) as IssueInvoiceResponse
-    const message = errorBody.error?.message || 'فشل إصدار الفاتورة.'
-    throw new Error(message)
+    await handleApiError(res)
   }
 
   const responseBody = (await res.json()) as IssueInvoiceResponse
 
   if (!responseBody.success) {
     const message = responseBody.error?.message || 'فشل إصدار الفاتورة.'
+    throw new Error(message)
+  }
+}
+
+// Cancel Invoice API
+interface CancelInvoiceRequest {
+  operatorId: string
+  storeId: string
+}
+
+interface CancelInvoiceResponse {
+  success: boolean
+  data?: {
+    id: string
+    status: 'CANCELLED'
+    previousStatus: string
+    cancelledAt: string
+    [key: string]: unknown
+  }
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function cancelInvoice(
+  invoiceId: string,
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<void> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/invoices/${invoiceId}/cancel`
+
+  const body: CancelInvoiceRequest = {
+    operatorId: userId,
+    storeId,
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    body: JSON.stringify({
+      operatorContext: body,
+    }),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    await handleApiError(res)
+  }
+
+  const responseBody = (await res.json()) as CancelInvoiceResponse
+
+  if (!responseBody.success) {
+    const message = responseBody.error?.message || 'فشل إلغاء الفاتورة.'
     throw new Error(message)
   }
 }
@@ -700,7 +774,11 @@ interface BillingResponse {
   }
 }
 
-export async function fetchStorePlan(): Promise<StorePlan> {
+export async function fetchStorePlan(
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<StorePlan> {
   const baseUrl = getApiBaseUrl()
   const url = `${baseUrl}/billing/plan`
 
@@ -708,12 +786,15 @@ export async function fetchStorePlan(): Promise<StorePlan> {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
     },
     cache: 'no-store',
   })
 
   if (!res.ok) {
-    throw new Error('تعذر جلب معلومات الخطة من الخادم.')
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as BillingResponse
@@ -745,7 +826,11 @@ interface PricingResponse {
   }
 }
 
-export async function fetchStorePricing(): Promise<StorePricing> {
+export async function fetchStorePricing(
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<StorePricing> {
   const baseUrl = getApiBaseUrl()
   const url = `${baseUrl}/billing/pricing`
 
@@ -753,12 +838,15 @@ export async function fetchStorePricing(): Promise<StorePricing> {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
     },
     cache: 'no-store',
   })
 
   if (!res.ok) {
-    throw new Error('تعذر جلب معلومات الأسعار من الخادم.')
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as PricingResponse

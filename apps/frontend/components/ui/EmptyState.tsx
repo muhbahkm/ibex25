@@ -4,6 +4,7 @@ export interface EmptyStateProps {
   message?: string
   description?: string
   className?: string
+  action?: React.ReactNode
 }
 
 /**
@@ -16,15 +17,21 @@ export function EmptyState({
   message = 'لا توجد بيانات',
   description,
   className = '',
+  action,
 }: EmptyStateProps) {
   return (
     <div
       className={`flex flex-col items-center justify-center py-12 px-4 text-center ${className}`}
     >
       <div className="flex flex-col items-center space-y-2">
-        <p className="text-body text-gray-900">{message}</p>
+        <p className="text-lg font-medium text-gray-900">{message}</p>
         {description && (
-          <p className="text-muted text-gray-500 max-w-sm">{description}</p>
+          <p className="text-body text-gray-500 max-w-sm mx-auto mb-6">{description}</p>
+        )}
+        {action && (
+          <div className="mt-2">
+            {action}
+          </div>
         )}
       </div>
     </div>

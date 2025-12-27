@@ -24,7 +24,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
     if (pathname.startsWith('/invoices/')) return 'تفاصيل الفاتورة'
     if (pathname === '/ledger') return 'السجل المالي'
     if (pathname === '/reports') return 'التقارير'
-    if (pathname === '/billing') return 'الفواتير'
+    if (pathname === '/billing') return 'الاشتراكات والفوترة'
     return undefined
   }
 

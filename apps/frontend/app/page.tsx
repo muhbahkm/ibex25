@@ -63,6 +63,8 @@ export default function Home() {
         const report = await fetchProfitLossReport(
           user.storeId,
           user.id,
+          user.id,
+          user.role,
         )
 
         if (!isMounted) return
@@ -70,9 +72,8 @@ export default function Home() {
         setProfitLoss(report)
       } catch (err) {
         if (!isMounted) return
-        const message =
-          err instanceof Error ? err.message : 'فشل تحميل بيانات التقرير المالي.'
-        setProfitLossError(message)
+        // Calm error message
+        setProfitLossError('تعذر تحميل ملخص المبيعات حالياً')
       } finally {
         if (isMounted) {
           setLoadingProfitLoss(false)
@@ -92,9 +93,8 @@ export default function Home() {
         setInvoices(allInvoices.slice(0, 5))
       } catch (err) {
         if (!isMounted) return
-        const message =
-          err instanceof Error ? err.message : 'فشل تحميل قائمة الفواتير.'
-        setInvoicesError(message)
+        // Calm error message
+        setInvoicesError('تعذر تحميل الفواتير الأخيرة')
       } finally {
         if (isMounted) {
           setLoadingInvoices(false)
@@ -115,34 +115,80 @@ export default function Home() {
 
   return (
     <RequirePermission permission={Permission.VIEW_REPORTS}>
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
         {/* Page Header */}
-        <div>
-          <h1 className="text-page-title mb-2">لوحة التحكم</h1>
-          <p className="text-muted">
-            نظرة سريعة على أداء المتجر والأنشطة الأخيرة
+        <div className="mb-2">
+          <h1 className="text-page-title mb-2">مرحباً بك في آيبكس 👋</h1>
+          <p className="text-muted hidden sm:block">
+            ملخص أداء المتجر اليومي وأهم المستجدات
           </p>
         </div>
 
+        {/* Onboarding Welcome - Shows only when no data exists */}
+        {!loadingProfitLoss && !loadingInvoices && invoices.length === 0 && profitLoss?.totalSales === 0 && (
+          <div className="bg-primary-50 border border-primary-100 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-primary-900 mb-2">
+              أهلاً بك في بداية جديدة! 🚀
+            </h2>
+            <p className="text-primary-800 mb-4 max-w-2xl">
+              نظام آيبكس مصمم ليجعل إدارتك المالية سهلة وموثوقة. لتبدأ العمل بشكل صحيح، اتبع الخطوات التالية:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white p-4 rounded-md border border-primary-100">
+                <div className="flex items-center gap-2 mb-2 text-primary-700 font-medium">
+                  <span className="w-6 h-6 flex items-center justify-center bg-primary-100 rounded-full text-xs">1</span>
+                  إنشاء فاتورة
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  أنشئ أول فاتورة مبيعات لعملائك سواء كانت مسودة أو جاهزة للإصدار.
+                </p>
+                <Link href="/invoices/new" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                  ابدأ الآن &larr;
+                </Link>
+              </div>
+              <div className="bg-white p-4 rounded-md border border-primary-100 opacity-75">
+                <div className="flex items-center gap-2 mb-2 text-gray-700 font-medium">
+                  <span className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-xs">2</span>
+                  مراقبة السجل
+                </div>
+                <p className="text-sm text-gray-600">
+                  كل حركة مالية (بيع أو تحصيل) سيتم تسجيلها تلقائياً في السجل المالي غير القابل للتعديل.
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-md border border-primary-100 opacity-75">
+                <div className="flex items-center gap-2 mb-2 text-gray-700 font-medium">
+                  <span className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-xs">3</span>
+                  متابعة التقارير
+                </div>
+                <p className="text-sm text-gray-600">
+                  شاهد أداء متجرك من خلال تقارير الأرباح والخسائر التي يتم تحديثها لحظياً.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* إجمالي المبيعات */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
             {loadingProfitLoss ? (
-              <LoadingState message="جاري التحميل..." />
+              <div className="flex flex-col justify-center min-h-[100px]">
+                <LoadingState message="جاري التحميل..." />
+              </div>
             ) : profitLossError ? (
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
                   إجمالي المبيعات
                 </p>
-                <p className="text-body text-gray-500">—</p>
+                <p className="text-body text-gray-400">—</p>
               </div>
             ) : (
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
                   إجمالي المبيعات
                 </p>
-                <p className="text-3xl font-semibold text-gray-900 text-numeric">
+                <p className="text-3xl font-semibold text-gray-900 text-numeric leading-tight">
                   {profitLoss ? formatCurrency(profitLoss.totalSales) : '0'} ر.س
                 </p>
               </div>
@@ -150,22 +196,24 @@ export default function Home() {
           </div>
 
           {/* إجمالي التحصيلات */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
             {loadingProfitLoss ? (
-              <LoadingState message="جاري التحميل..." />
+              <div className="flex flex-col justify-center min-h-[100px]">
+                <LoadingState message="جاري التحميل..." />
+              </div>
             ) : profitLossError ? (
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
                   إجمالي التحصيلات
                 </p>
-                <p className="text-body text-gray-500">—</p>
+                <p className="text-body text-gray-400">—</p>
               </div>
             ) : (
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
                   إجمالي التحصيلات
                 </p>
-                <p className="text-3xl font-semibold text-gray-900 text-numeric">
+                <p className="text-3xl font-semibold text-gray-900 text-numeric leading-tight">
                   {profitLoss ? formatCurrency(profitLoss.totalReceipts) : '0'} ر.س
                 </p>
               </div>
@@ -173,22 +221,24 @@ export default function Home() {
           </div>
 
           {/* صافي الإيرادات */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
             {loadingProfitLoss ? (
-              <LoadingState message="جاري التحميل..." />
+              <div className="flex flex-col justify-center min-h-[100px]">
+                <LoadingState message="جاري التحميل..." />
+              </div>
             ) : profitLossError ? (
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
                   صافي الإيرادات
                 </p>
-                <p className="text-body text-gray-500">—</p>
+                <p className="text-body text-gray-400">—</p>
               </div>
             ) : (
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
                   صافي الإيرادات
                 </p>
-                <p className="text-3xl font-semibold text-gray-900 text-numeric">
+                <p className="text-3xl font-semibold text-gray-900 text-numeric leading-tight">
                   {profitLoss ? formatCurrency(profitLoss.netRevenue) : '0'} ر.س
                 </p>
               </div>
@@ -196,15 +246,17 @@ export default function Home() {
           </div>
 
           {/* حالة الاشتراك */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
             {loadingPlan ? (
-              <LoadingState message="جاري التحميل..." />
+              <div className="flex flex-col justify-center min-h-[100px]">
+                <LoadingState message="جاري التحميل..." />
+              </div>
             ) : (
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
                   حالة الاشتراك
-                  </p>
-                <p className="text-3xl font-semibold text-gray-900">
+                </p>
+                <p className="text-2xl font-semibold text-gray-900 leading-tight">
                   {storePlan?.plan.name || 'غير محدد'}
                 </p>
               </div>
@@ -213,83 +265,87 @@ export default function Home() {
         </div>
 
         {/* Error Messages */}
-        {profitLossError && <ErrorMessage message={profitLossError} />}
-        {invoicesError && <ErrorMessage message={invoicesError} />}
+        {(profitLossError || invoicesError) && (
+          <div className="space-y-3">
+            {profitLossError && <ErrorMessage message={profitLossError} />}
+            {invoicesError && <ErrorMessage message={invoicesError} />}
+          </div>
+        )}
 
-        {/* Latest Invoices */}
-        <div>
-          <h2 className="text-section-title mb-4">آخر الفواتير</h2>
-          {loadingInvoices ? (
-            <Table>
-              <TableBody>
-                <TableRow>
-                  <TableCell colSpan={5} align="center" className="py-12">
-                    <LoadingState message="جاري تحميل الفواتير..." />
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          ) : invoices.length === 0 ? (
-            <Table>
-              <TableBody>
-                <TableRow>
-                  <TableCell colSpan={5} align="center" className="py-12">
-                    <EmptyState
-                      message="لا توجد فواتير"
-                      description="لم يتم إنشاء أي فواتير حتى الآن"
-                    />
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableHeaderCell align="right">رقم الفاتورة</TableHeaderCell>
-                <TableHeaderCell align="right">العميل</TableHeaderCell>
-                <TableHeaderCell align="right">الحالة</TableHeaderCell>
-                <TableHeaderCell align="left">المبلغ الإجمالي</TableHeaderCell>
-                <TableHeaderCell align="right">الإجراء</TableHeaderCell>
-              </TableHeader>
-              <TableBody>
-                {invoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell align="right">
-                      <span className="text-body">{shortenInvoiceId(invoice.id)}</span>
-                    </TableCell>
-                    <TableCell align="right">
-                      <span className="text-body">
-                        {invoice.customerName || 'عميل نقدي'}
-                      </span>
-                    </TableCell>
-                    <TableCell align="right">
-                      <StatusBadge status={invoice.status} />
-                    </TableCell>
-                    <TableCell align="left">
-                      <span className="text-numeric">
-                        {formatCurrency(Number(invoice.totalAmount))} ر.س
-                      </span>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Link
-                        href={`/invoices/${invoice.id}`}
-                        className="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 transition-colors"
-                      >
-                        <Icon name="visibility" className="text-base" />
-                        <span>عرض</span>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+        {/* Latest Invoices Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="px-6 py-5 border-b border-gray-200">
+            <h2 className="text-section-title">آخر الفواتير</h2>
+          </div>
+          <div className="p-6">
+            {loadingInvoices ? (
+              <div className="py-12">
+                <LoadingState message="جاري تحميل الفواتير..." />
+              </div>
+            ) : invoices.length === 0 ? (
+              <div className="py-12">
+                <EmptyState
+                  message="ابدأ رحلة مبيعاتك"
+                  description="لم تقم بإنشاء أي فاتورة بعد. أنشئ فاتورتك الأولى الآن لتبدأ في تتبع مبيعاتك."
+                  action={
+                    <Link href="/invoices/new">
+                      <Button variant="primary" size="md" className="gap-2">
+                        <Icon name="add" />
+                        <span>إنشاء فاتورة جديدة</span>
+                      </Button>
+                    </Link>
+                  }
+                />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableHeaderCell align="right">رقم الفاتورة</TableHeaderCell>
+                  <TableHeaderCell align="right">العميل</TableHeaderCell>
+                  <TableHeaderCell align="right">الحالة</TableHeaderCell>
+                  <TableHeaderCell align="left">المبلغ الإجمالي</TableHeaderCell>
+                  <TableHeaderCell align="right">الإجراء</TableHeaderCell>
+                </TableHeader>
+                <TableBody>
+                  {invoices.map((invoice) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell align="right">
+                        <span className="text-body font-medium">{shortenInvoiceId(invoice.id)}</span>
+                      </TableCell>
+                      <TableCell align="right">
+                        <span className="text-body">
+                          {invoice.customerName || 'عميل نقدي'}
+                        </span>
+                      </TableCell>
+                      <TableCell align="right">
+                        <StatusBadge status={invoice.status} />
+                      </TableCell>
+                      <TableCell align="left">
+                        <span className="text-numeric font-medium">
+                          {formatCurrency(Number(invoice.totalAmount))} ر.س
+                        </span>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Link
+                          href={`/invoices/${invoice.id}`}
+                          className="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 transition-colors font-medium"
+                        >
+                          <Icon name="visibility" className="text-base" />
+                          <span>عرض</span>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
         </div>
 
-        {/* Quick Links */}
-        <div>
-          <h2 className="text-section-title mb-4">روابط سريعة</h2>
-          <div className="flex flex-wrap gap-3">
+        {/* Quick Links Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+          <h2 className="text-section-title mb-4 sm:mb-5">روابط سريعة</h2>
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3">
             <RequirePermission permission={Permission.ISSUE_INVOICE}>
               <Link href="/invoices/new">
                 <Button variant="primary" size="md" className="gap-2">

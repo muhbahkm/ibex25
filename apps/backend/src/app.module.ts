@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { InvoicesModule } from './invoices/invoices.module';
 import { CustomersModule } from './customers/customers.module';
 import { LedgerModule } from './ledger/ledger.module';
+import { ReportsModule } from './reports/reports.module';
 import { BillingModule } from './billing/billing.module';
 import { StripeModule } from './billing/stripe/stripe.module';
 import { UsageModule } from './usage/usage.module';
@@ -16,6 +17,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     InvoicesModule,
     CustomersModule,
     LedgerModule,
+    ReportsModule,
     BillingModule,
     StripeModule, // B4: Stripe integration
     UsageModule,

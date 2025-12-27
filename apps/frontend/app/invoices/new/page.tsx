@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { RequirePermission } from '@/auth/RequirePermission'
 import { Permission } from '@/auth/roles'
 import { useAuth } from '@/auth/useAuth'
@@ -61,7 +62,7 @@ export default function NewInvoicePage() {
       } catch (err) {
         if (!isMounted) return
         const message =
-          err instanceof Error ? err.message : 'فشل تحميل البيانات.'
+          err instanceof Error ? err.message : 'تعذر تحميل بيانات المنتجات والعملاء'
         setError(message)
       } finally {
         if (isMounted) {
@@ -131,7 +132,7 @@ export default function NewInvoicePage() {
 
   const handleSave = async () => {
     if (items.length === 0) {
-      setError('يجب إضافة عنصر واحد على الأقل.')
+      setError('الرجاء إضافة منتج واحد على الأقل للفاتورة')
       return
     }
 
@@ -152,10 +153,11 @@ export default function NewInvoicePage() {
         user.role,
       )
 
+      // Redirect to edit page to allow further editing or issuing
       router.push(`/invoices/${invoiceId}/edit`)
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'فشل حفظ الفاتورة.'
+        err instanceof Error ? err.message : 'تعذر حفظ الفاتورة'
       setError(message)
     } finally {
       setIsSaving(false)
@@ -181,8 +183,17 @@ export default function NewInvoicePage() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Page Header */}
         <div>
-          <h1 className="text-page-title mb-2">إنشاء فاتورة جديدة</h1>
-          <p className="text-muted">قم بإنشاء فاتورة مسودة جديدة يمكنك تعديلها لاحقاً</p>
+          <div className="mb-3">
+            <Link
+              href="/invoices"
+              className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors mb-2"
+            >
+              <Icon name="arrow_back" className="text-base" />
+              <span>العودة إلى قائمة الفواتير</span>
+            </Link>
+          </div>
+          <h1 className="text-page-title mb-2">فاتورة بيع جديدة</h1>
+          <p className="text-muted hidden sm:block">ابدأ بإنشاء مسودة للفاتورة، يمكنك مراجعتها وتعديلها قبل الإصدار النهائي.</p>
         </div>
 
         {/* Error State */}
@@ -229,8 +240,8 @@ export default function NewInvoicePage() {
 
             {items.length === 0 ? (
               <EmptyState
-                message="لا توجد عناصر"
-                description="اضغط على 'إضافة عنصر' لبدء إضافة العناصر إلى الفاتورة"
+                message="السلة فارغة"
+                description="أضف منتجات إلى الفاتورة للمتابعة"
               />
             ) : (
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

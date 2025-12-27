@@ -45,6 +45,8 @@ export default function ReportsPage() {
       const report = await fetchProfitLossReport(
         user.storeId,
         user.id,
+        user.id,
+        user.role,
         fromDateISO,
         toDateISO,
       )
@@ -58,7 +60,7 @@ export default function ReportsPage() {
       if (!isMounted) return
 
       const message =
-        err instanceof Error ? err.message : 'فشل تحميل بيانات التقرير.'
+        err instanceof Error ? err.message : 'تعذر تحميل التقرير'
       setError(message)
     } finally {
       if (isMounted) {
@@ -94,9 +96,9 @@ export default function ReportsPage() {
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Page Header */}
         <div>
-          <h1 className="text-page-title mb-2">تقرير الأرباح والخسائر</h1>
-          <p className="text-muted">
-            عرض ملخص الأداء المالي للمتجر (المبيعات والتحصيلات)
+          <h1 className="text-page-title mb-2">الأرباح والخسائر</h1>
+          <p className="text-muted hidden sm:block">
+            تحليل الأداء المالي بناءً على السجل المالي الموثق
           </p>
         </div>
 
@@ -105,7 +107,7 @@ export default function ReportsPage() {
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <form onSubmit={handleFilter} className="flex flex-wrap items-end gap-4">
+          <form onSubmit={handleFilter} className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-end gap-4">
             <div className="flex-1 min-w-[200px]">
               <label
                 htmlFor="fromDate"
@@ -136,14 +138,14 @@ export default function ReportsPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-body"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <Button
                 type="submit"
                 variant="primary"
                 size="md"
                 disabled={isLoading}
                 isLoading={isLoading}
-                className="gap-2"
+                className="gap-2 w-full sm:w-auto"
               >
                 {!isLoading && <Icon name="filter_list" />}
                 <span>تصفية</span>
@@ -155,7 +157,7 @@ export default function ReportsPage() {
                   size="md"
                   onClick={handleClearFilters}
                   disabled={isLoading}
-                  className="gap-2"
+                  className="gap-2 w-full sm:w-auto"
                 >
                   <Icon name="clear" />
                   <span>مسح</span>
@@ -163,6 +165,27 @@ export default function ReportsPage() {
               )}
             </div>
           </form>
+        </div>
+
+        {/* Info Card - How to read this report */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Icon name="lightbulb" className="text-gray-500 text-xl flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-gray-900">
+                كيف تقرأ هذا التقرير؟
+              </p>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                هذه الأرقام تعكس واقعك المالي بدقة بناءً على الفواتير والسجل المالي:
+                <br />
+                • <strong>إجمالي المبيعات:</strong> قيمة الفواتير التي أصدرتها (سواء دُفعت أم لا). تعكس حجم نشاطك التجاري.
+                <br />
+                • <strong>إجمالي التحصيلات:</strong> السيولة النقدية التي دخلت فعلياً للصندوق.
+                <br />
+                • <strong>صافي الإيرادات:</strong> (المبيعات - التحصيلات) يمثل المبالغ المتبقية لك عند العملاء (الديون المستحقة).
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Financial Summary Cards */}
@@ -181,9 +204,9 @@ export default function ReportsPage() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
             <div className="flex flex-col items-center justify-center text-center">
               <Icon name="assessment" className="text-gray-400 text-6xl mb-4" />
-              <p className="text-body text-gray-900 mb-2 font-medium">لا توجد بيانات متاحة</p>
-              <p className="text-muted max-w-md">
-                لا توجد حركات مالية في الفترة المحددة
+              <p className="text-lg font-medium text-gray-900 mb-2">لا توجد بيانات للعرض</p>
+              <p className="text-body text-gray-500 max-w-md">
+                الأرقام تظهر هنا تلقائياً بمجرد وجود نشاط في السجل المالي
               </p>
             </div>
           </div>

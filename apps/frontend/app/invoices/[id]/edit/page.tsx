@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 import { RequirePermission } from '@/auth/RequirePermission'
 import { Permission } from '@/auth/roles'
 import { useAuth } from '@/auth/useAuth'
@@ -69,7 +70,7 @@ export default function EditInvoicePage() {
 
         // Check if invoice is DRAFT
         if (invoiceData.status !== 'DRAFT') {
-          setError('لا يمكن تعديل فاتورة بعد إصدارها.')
+          setError('عذراً، لا يمكن تعديل الفواتير المعتمدة')
           return
         }
 
@@ -85,7 +86,7 @@ export default function EditInvoicePage() {
       } catch (err) {
         if (!isMounted) return
         const message =
-          err instanceof Error ? err.message : 'فشل تحميل البيانات.'
+          err instanceof Error ? err.message : 'تعذر تحميل بيانات الفاتورة'
         setError(message)
       } finally {
         if (isMounted) {
@@ -155,12 +156,12 @@ export default function EditInvoicePage() {
 
   const handleSave = async () => {
     if (!invoice || invoice.status !== 'DRAFT') {
-      setError('لا يمكن تعديل فاتورة بعد إصدارها.')
+      setError('عذراً، لا يمكن تعديل الفواتير المعتمدة')
       return
     }
 
     if (items.length === 0) {
-      setError('يجب إضافة عنصر واحد على الأقل.')
+      setError('الرجاء إضافة منتج واحد على الأقل للفاتورة')
       return
     }
 
@@ -198,9 +199,12 @@ export default function EditInvoicePage() {
           unitPrice: item.unitPrice,
         })),
       )
+
+      // Clear error on success
+      setError(null)
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'فشل تحديث الفاتورة.'
+        err instanceof Error ? err.message : 'تعذر تحديث الفاتورة'
       setError(message)
     } finally {
       setIsSaving(false)
@@ -264,9 +268,18 @@ export default function EditInvoicePage() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Page Header */}
         <div>
+          <div className="mb-3">
+            <Link
+              href="/invoices"
+              className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors mb-2"
+            >
+              <Icon name="arrow_back" className="text-base" />
+              <span>العودة إلى قائمة الفواتير</span>
+            </Link>
+          </div>
           <h1 className="text-page-title mb-2">تعديل الفاتورة</h1>
-          <div className="flex items-center gap-4">
-            <p className="text-muted">الفاتورة #{invoice.id}</p>
+          <div className="flex flex-wrap items-center gap-4">
+            <p className="text-muted">الفاتورة #{invoice.id.substring(0, 8)}...</p>
             <StatusBadge status={invoice.status} />
           </div>
         </div>
@@ -416,26 +429,39 @@ export default function EditInvoicePage() {
           </div>
 
           {/* Actions */}
-          <div className="p-6 flex justify-end gap-3">
+          <div className="p-6 flex flex-col sm:flex-row justify-end gap-3">
             <Button
               variant="secondary"
               size="md"
               onClick={handleCancel}
               disabled={isSaving}
+              className="w-full sm:w-auto"
             >
               إلغاء
             </Button>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={handleSave}
-              disabled={isSaving || items.length === 0}
-              isLoading={isSaving}
-              className="gap-2"
-            >
-              {!isSaving && <Icon name="save" />}
-              <span>حفظ مسودة</span>
-            </Button>
+            <div className="flex gap-3 w-full sm:w-auto">
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => router.push(`/invoices/${invoiceId}/issue`)}
+                disabled={isSaving || items.length === 0}
+                className="flex-1 sm:flex-initial gap-2"
+              >
+                <Icon name="check_circle" />
+                <span>إصدار الفاتورة</span>
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={handleSave}
+                disabled={isSaving || items.length === 0}
+                isLoading={isSaving}
+                className="flex-1 sm:flex-initial gap-2"
+              >
+                {!isSaving && <Icon name="save" />}
+                <span>حفظ مسودة</span>
+              </Button>
+            </div>
           </div>
         </div>
       </div>

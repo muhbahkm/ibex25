@@ -18,4 +18,10 @@ export {
 export { LoadingState, type LoadingStateProps } from './LoadingState'
 export { EmptyState, type EmptyStateProps } from './EmptyState'
 export { ErrorMessage, type ErrorMessageProps } from './ErrorMessage'
+export {
+  Skeleton,
+  TableSkeleton,
+  CardSkeleton,
+  type SkeletonProps,
+} from './Skeleton'
 

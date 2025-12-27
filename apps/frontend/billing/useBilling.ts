@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useAuth } from '@/auth/useAuth'
 import { fetchStorePlan, fetchStorePricing, StorePlan, StorePricing } from '@/lib/api'
 
 /**
@@ -11,6 +12,7 @@ import { fetchStorePlan, fetchStorePricing, StorePlan, StorePricing } from '@/li
  * This is read-only - no mutations, no payments, no billing logic.
  */
 export function useBilling() {
+  const { user } = useAuth()
   const [plan, setPlan] = useState<StorePlan | null>(null)
   const [pricing, setPricing] = useState<StorePricing | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
@@ -26,8 +28,8 @@ export function useBilling() {
 
         // Load plan and pricing in parallel
         const [planData, pricingData] = await Promise.all([
-          fetchStorePlan(),
-          fetchStorePricing(),
+          fetchStorePlan(user.id, user.storeId, user.role),
+          fetchStorePricing(user.id, user.storeId, user.role),
         ])
 
         if (!isMounted) return
@@ -51,7 +53,7 @@ export function useBilling() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [user.id, user.storeId, user.role])
 
   return {
     plan,
