@@ -1,430 +1,376 @@
- 'use client'
+'use client'
 
 import { useEffect, useState } from 'react'
-import Icon from '@/components/Icon'
-import {
-  fetchCustomers,
-  fetchCustomerStatement,
-  settleInvoice,
-  CustomerStatement,
-  CustomerSummary,
-} from '@/lib/api'
-import { formatCurrency, formatDate } from '@/lib/format'
+import Link from 'next/link'
 import { RequirePermission } from '@/auth/RequirePermission'
+import { Permission } from '@/auth/roles'
+import { useAuth } from '@/auth/useAuth'
+import { useBilling } from '@/billing/useBilling'
+import { formatCurrency, formatDate } from '@/lib/format'
+import {
+  fetchInvoices,
+  fetchProfitLossReport,
+  Invoice,
+} from '@/lib/api'
+import {
+  Button,
+  StatusBadge,
+  Table,
+  TableHeader,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+  LoadingState,
+  EmptyState,
+  ErrorMessage,
+} from '@/components/ui'
+import Icon from '@/components/Icon'
 
-interface DashboardState {
-  totalSales: number
-  outstandingBalance: number
-  invoicesCount: number
-}
-
+/**
+ * Dashboard Page Component
+ *
+ * Decision-oriented dashboard for store owners/managers.
+ * Displays key business metrics and recent activity at a glance.
+ */
 export default function Home() {
-  const [customers, setCustomers] = useState<CustomerSummary[]>([])
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
-    null,
-  )
-  const [statement, setStatement] = useState<CustomerStatement | null>(null)
-  const [data, setData] = useState<DashboardState | null>(null)
-  const [loadingCustomers, setLoadingCustomers] = useState<boolean>(true)
-  const [loadingStatement, setLoadingStatement] = useState<boolean>(false)
-  const [settlingInvoiceId, setSettlingInvoiceId] = useState<string | null>(
-    null,
-  )
-  const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
+  const { plan: storePlan, loading: loadingPlan } = useBilling()
+  
+  // Profit & Loss data
+  const [profitLoss, setProfitLoss] = useState<{
+    totalSales: number
+    totalReceipts: number
+    netRevenue: number
+  } | null>(null)
+  const [loadingProfitLoss, setLoadingProfitLoss] = useState<boolean>(true)
+  const [profitLossError, setProfitLossError] = useState<string | null>(null)
+
+  // Latest invoices
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [loadingInvoices, setLoadingInvoices] = useState<boolean>(true)
+  const [invoicesError, setInvoicesError] = useState<string | null>(null)
 
   useEffect(() => {
     let isMounted = true
 
-    async function loadInitial() {
+    async function loadDashboardData() {
+      // Load profit & loss report
       try {
-        setLoadingCustomers(true)
-        setError(null)
+        setLoadingProfitLoss(true)
+        setProfitLossError(null)
 
-        const customerList = await fetchCustomers()
+        const report = await fetchProfitLossReport(
+          user.storeId,
+          user.id,
+          user.id,
+          user.role,
+        )
 
         if (!isMounted) return
 
-        setCustomers(customerList)
-
-        if (customerList.length > 0) {
-          const firstCustomerId = customerList[0].id
-          setSelectedCustomerId(firstCustomerId)
-          await loadStatement(firstCustomerId, isMounted)
-        }
+        setProfitLoss(report)
       } catch (err) {
         if (!isMounted) return
-        const message =
-          err instanceof Error
-            ? err.message
-            : 'حدث خطأ غير متوقع أثناء جلب البيانات.'
-        setError(message)
+        // Calm error message
+        setProfitLossError('تعذر تحميل ملخص المبيعات حالياً')
       } finally {
         if (isMounted) {
-          setLoadingCustomers(false)
+          setLoadingProfitLoss(false)
         }
       }
-    }
 
-    async function loadStatement(
-      customerId: string,
-      stillMounted: boolean,
-    ): Promise<void> {
+      // Load latest invoices
       try {
-        setLoadingStatement(true)
-        setError(null)
+        setLoadingInvoices(true)
+        setInvoicesError(null)
 
-        const statementData: CustomerStatement =
-          await fetchCustomerStatement(customerId)
+        const allInvoices = await fetchInvoices(user.id, user.storeId, user.role)
 
-        if (!stillMounted) return
+        if (!isMounted) return
 
-        setStatement(statementData)
-        setData({
-          totalSales: statementData.summary.totalSales,
-          outstandingBalance: statementData.summary.outstandingBalance,
-          invoicesCount: statementData.invoices.length,
-        })
+        // Take latest 5 (already sorted by createdAt DESC from backend)
+        setInvoices(allInvoices.slice(0, 5))
       } catch (err) {
-        if (!stillMounted) return
-        const message =
-          err instanceof Error
-            ? err.message
-            : 'حدث خطأ غير متوقع أثناء جلب البيانات.'
-        setError(message)
+        if (!isMounted) return
+        // Calm error message
+        setInvoicesError('تعذر تحميل الفواتير الأخيرة')
       } finally {
-        if (stillMounted) {
-          setLoadingStatement(false)
+        if (isMounted) {
+          setLoadingInvoices(false)
         }
       }
     }
 
-    loadInitial()
+    loadDashboardData()
 
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [user.id, user.storeId, user.role])
 
-  const formatInteger = (value: number) =>
-    value.toLocaleString('ar-EG', {
-      maximumFractionDigits: 0,
-    })
-
-  const isLoading = loadingCustomers || loadingStatement
-
-  const totalSalesDisplay =
-    data && !isLoading ? formatCurrency(data.totalSales) : '...'
-  const outstandingBalanceDisplay =
-    data && !isLoading ? formatCurrency(data.outstandingBalance) : '...'
-  const invoicesCountDisplay =
-    data && !isLoading ? formatInteger(data.invoicesCount) : '...'
-
-  const handleCustomerChange = async (
-    event: React.ChangeEvent<HTMLSelectElement>,
-  ) => {
-    const customerId = event.target.value
-    setSelectedCustomerId(customerId)
-
-    if (!customerId) {
-      setData(null)
-      setLoadingStatement(false)
-      return
-    }
-
-    try {
-      setLoadingStatement(true)
-      setError(null)
-
-      const statementData = await fetchCustomerStatement(customerId)
-
-      setStatement(statementData)
-      setData({
-        totalSales: statementData.summary.totalSales,
-        outstandingBalance: statementData.summary.outstandingBalance,
-        invoicesCount: statementData.invoices.length,
-      })
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : 'حدث خطأ غير متوقع أثناء جلب البيانات.'
-      setError(message)
-    } finally {
-      setLoadingStatement(false)
-    }
-  }
-
-  const handleSettleInvoice = async (invoiceId: string) => {
-    if (!selectedCustomerId) return
-
-    try {
-      setSettlingInvoiceId(invoiceId)
-      setError(null)
-
-      await settleInvoice(invoiceId)
-
-      // Re-fetch statement after successful settlement
-      const statementData = await fetchCustomerStatement(selectedCustomerId)
-
-      setStatement(statementData)
-      setData({
-        totalSales: statementData.summary.totalSales,
-        outstandingBalance: statementData.summary.outstandingBalance,
-        invoicesCount: statementData.invoices.length,
-      })
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : 'حدث خطأ أثناء تسوية الفاتورة.'
-      setError(message)
-    } finally {
-      setSettlingInvoiceId(null)
-    }
-  }
-
-  const getStatusLabel = (status: string): string => {
-    switch (status) {
-      case 'PAID':
-        return 'مسددة'
-      case 'UNPAID':
-        return 'غير مسددة'
-      case 'CANCELLED':
-        return 'ملغاة'
-      default:
-        return status
-    }
-  }
-
-  const getStatusColor = (status: string): string => {
-    switch (status) {
-      case 'PAID':
-        return 'bg-green-100 text-green-800'
-      case 'UNPAID':
-        return 'bg-orange-100 text-orange-800'
-      case 'CANCELLED':
-        return 'bg-gray-100 text-gray-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
+  const shortenInvoiceId = (id: string): string => {
+    return id.substring(0, 8) + '...'
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">لوحة التحكم</h1>
+    <RequirePermission permission={Permission.VIEW_REPORTS}>
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        {/* Page Header */}
+        <div className="mb-2">
+          <h1 className="text-page-title mb-2">مرحباً بك في آيبكس 👋</h1>
+          <p className="text-muted hidden sm:block">
+            ملخص أداء المتجر اليومي وأهم المستجدات
+          </p>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Global loading state */}
-        {isLoading && (
-          <div className="rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-            جاري تحميل بيانات لوحة التحكم...
-          </div>
-        )}
-        {/* Customer Selector */}
-        <section className="flex flex-col gap-3">
-          <label
-            htmlFor="customer"
-            className="text-sm font-medium text-gray-700 flex items-center gap-2"
-          >
-            <Icon name="person" className="text-gray-500 text-xl" />
-            اختر العميل
-          </label>
-          <select
-            id="customer"
-            className="max-w-md rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            value={selectedCustomerId ?? ''}
-            onChange={handleCustomerChange}
-            disabled={loadingCustomers || customers.length === 0}
-          >
-            {loadingCustomers && (
-              <option value="">جاري تحميل قائمة العملاء...</option>
-            )}
-            {!loadingCustomers && customers.length === 0 && (
-              <option value="">لا توجد عملاء</option>
-            )}
-            {!loadingCustomers &&
-              customers.length > 0 &&
-              customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name} {customer.storeName && `— ${customer.storeName}`}
-                </option>
-              ))}
-          </select>
-
-          {!loadingCustomers && customers.length === 0 && (
-            <p className="text-xs text-gray-500 mt-1">
-              لا توجد عملاء مسجلون حتى الآن. أضف عملاء من نظام الخلفية لعرض بياناتهم هنا.
+        {/* Onboarding Welcome - Shows only when no data exists */}
+        {!loadingProfitLoss && !loadingInvoices && invoices.length === 0 && profitLoss?.totalSales === 0 && (
+          <div className="bg-primary-50 border border-primary-100 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-primary-900 mb-2">
+              أهلاً بك في بداية جديدة! 🚀
+            </h2>
+            <p className="text-primary-800 mb-4 max-w-2xl">
+              نظام آيبكس مصمم ليجعل إدارتك المالية سهلة وموثوقة. لتبدأ العمل بشكل صحيح، اتبع الخطوات التالية:
             </p>
-          )}
-        </section>
-
-        {/* Error State */}
-        {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* Stats Cards - Only visible if user has VIEW_REPORTS permission */}
-        <RequirePermission permission="VIEW_REPORTS">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-2">
-          {/* إجمالي المبيعات */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">إجمالي المبيعات</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
-                  {totalSalesDisplay}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white p-4 rounded-md border border-primary-100">
+                <div className="flex items-center gap-2 mb-2 text-primary-700 font-medium">
+                  <span className="w-6 h-6 flex items-center justify-center bg-primary-100 rounded-full text-xs">1</span>
+                  إنشاء فاتورة
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  أنشئ أول فاتورة مبيعات لعملائك سواء كانت مسودة أو جاهزة للإصدار.
                 </p>
-                {isLoading && (
-                  <p className="mt-1 text-xs text-gray-400">جاري تحميل البيانات...</p>
-                )}
+                <Link href="/invoices/new" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                  ابدأ الآن &larr;
+                </Link>
               </div>
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <Icon name="payments" className="text-blue-600 text-2xl" />
+              <div className="bg-white p-4 rounded-md border border-primary-100 opacity-75">
+                <div className="flex items-center gap-2 mb-2 text-gray-700 font-medium">
+                  <span className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-xs">2</span>
+                  مراقبة السجل
+                </div>
+                <p className="text-sm text-gray-600">
+                  كل حركة مالية (بيع أو تحصيل) سيتم تسجيلها تلقائياً في السجل المالي غير القابل للتعديل.
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-md border border-primary-100 opacity-75">
+                <div className="flex items-center gap-2 mb-2 text-gray-700 font-medium">
+                  <span className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-xs">3</span>
+                  متابعة التقارير
+                </div>
+                <p className="text-sm text-gray-600">
+                  شاهد أداء متجرك من خلال تقارير الأرباح والخسائر التي يتم تحديثها لحظياً.
+                </p>
               </div>
             </div>
           </div>
+        )}
 
-          {/* الرصيد المستحق */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">الرصيد غير المسدد</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
-                  {outstandingBalanceDisplay}
-                </p>
-                {isLoading && (
-                  <p className="mt-1 text-xs text-gray-400">جاري تحميل البيانات...</p>
-                )}
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* إجمالي المبيعات */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+            {loadingProfitLoss ? (
+              <div className="flex flex-col justify-center min-h-[100px]">
+                <LoadingState message="جاري التحميل..." />
               </div>
-              <div className="p-3 bg-orange-50 rounded-lg">
-                <Icon
-                  name="account_balance_wallet"
-                  className="text-orange-600 text-2xl"
+            ) : profitLossError ? (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
+                  إجمالي المبيعات
+                </p>
+                <p className="text-body text-gray-400">—</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
+                  إجمالي المبيعات
+                </p>
+                <p className="text-3xl font-semibold text-gray-900 text-numeric leading-tight">
+                  {profitLoss ? formatCurrency(profitLoss.totalSales) : '0'} ر.س
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* إجمالي التحصيلات */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+            {loadingProfitLoss ? (
+              <div className="flex flex-col justify-center min-h-[100px]">
+                <LoadingState message="جاري التحميل..." />
+              </div>
+            ) : profitLossError ? (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
+                  إجمالي التحصيلات
+                </p>
+                <p className="text-body text-gray-400">—</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
+                  إجمالي التحصيلات
+                </p>
+                <p className="text-3xl font-semibold text-gray-900 text-numeric leading-tight">
+                  {profitLoss ? formatCurrency(profitLoss.totalReceipts) : '0'} ر.س
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* صافي الإيرادات */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+            {loadingProfitLoss ? (
+              <div className="flex flex-col justify-center min-h-[100px]">
+                <LoadingState message="جاري التحميل..." />
+              </div>
+            ) : profitLossError ? (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
+                  صافي الإيرادات
+                </p>
+                <p className="text-body text-gray-400">—</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
+                  صافي الإيرادات
+                </p>
+                <p className="text-3xl font-semibold text-gray-900 text-numeric leading-tight">
+                  {profitLoss ? formatCurrency(profitLoss.netRevenue) : '0'} ر.س
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* حالة الاشتراك */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+            {loadingPlan ? (
+              <div className="flex flex-col justify-center min-h-[100px]">
+                <LoadingState message="جاري التحميل..." />
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">
+                  حالة الاشتراك
+                </p>
+                <p className="text-2xl font-semibold text-gray-900 leading-tight">
+                  {storePlan?.plan.name || 'غير محدد'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Error Messages */}
+        {(profitLossError || invoicesError) && (
+          <div className="space-y-3">
+            {profitLossError && <ErrorMessage message={profitLossError} />}
+            {invoicesError && <ErrorMessage message={invoicesError} />}
+          </div>
+        )}
+
+        {/* Latest Invoices Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="px-6 py-5 border-b border-gray-200">
+            <h2 className="text-section-title">آخر الفواتير</h2>
+          </div>
+          <div className="p-6">
+            {loadingInvoices ? (
+              <div className="py-12">
+                <LoadingState message="جاري تحميل الفواتير..." />
+              </div>
+            ) : invoices.length === 0 ? (
+              <div className="py-12">
+                <EmptyState
+                  message="ابدأ رحلة مبيعاتك"
+                  description="لم تقم بإنشاء أي فاتورة بعد. أنشئ فاتورتك الأولى الآن لتبدأ في تتبع مبيعاتك."
+                  action={
+                    <Link href="/invoices/new">
+                      <Button variant="primary" size="md" className="gap-2">
+                        <Icon name="add" />
+                        <span>إنشاء فاتورة جديدة</span>
+                      </Button>
+                    </Link>
+                  }
                 />
               </div>
-            </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableHeaderCell align="right">رقم الفاتورة</TableHeaderCell>
+                  <TableHeaderCell align="right">العميل</TableHeaderCell>
+                  <TableHeaderCell align="right">الحالة</TableHeaderCell>
+                  <TableHeaderCell align="left">المبلغ الإجمالي</TableHeaderCell>
+                  <TableHeaderCell align="right">الإجراء</TableHeaderCell>
+                </TableHeader>
+                <TableBody>
+                  {invoices.map((invoice) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell align="right">
+                        <span className="text-body font-medium">{shortenInvoiceId(invoice.id)}</span>
+                      </TableCell>
+                      <TableCell align="right">
+                        <span className="text-body">
+                          {invoice.customerName || 'عميل نقدي'}
+                        </span>
+                      </TableCell>
+                      <TableCell align="right">
+                        <StatusBadge status={invoice.status} />
+                      </TableCell>
+                      <TableCell align="left">
+                        <span className="text-numeric font-medium">
+                          {formatCurrency(Number(invoice.totalAmount))} ر.س
+                        </span>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Link
+                          href={`/invoices/${invoice.id}`}
+                          className="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 transition-colors font-medium"
+                        >
+                          <Icon name="visibility" className="text-base" />
+                          <span>عرض</span>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </div>
+        </div>
 
-          {/* عدد الفواتير */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">إجمالي الفواتير</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
-                  {invoicesCountDisplay}
-                </p>
-                {isLoading && (
-                  <p className="mt-1 text-xs text-gray-400">جاري تحميل البيانات...</p>
-                )}
-              </div>
-              <div className="p-3 bg-green-50 rounded-lg">
-                <Icon name="receipt" className="text-green-600 text-2xl" />
-              </div>
-            </div>
+        {/* Quick Links Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+          <h2 className="text-section-title mb-4 sm:mb-5">روابط سريعة</h2>
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+            <RequirePermission permission={Permission.ISSUE_INVOICE}>
+              <Link href="/invoices/new">
+                <Button variant="primary" size="md" className="gap-2">
+                  <Icon name="add" />
+                  <span>إنشاء فاتورة جديدة</span>
+                </Button>
+              </Link>
+            </RequirePermission>
+            <Link href="/invoices">
+              <Button variant="secondary" size="md" className="gap-2">
+                <Icon name="receipt" />
+                <span>عرض كل الفواتير</span>
+              </Button>
+            </Link>
+            <RequirePermission permission={Permission.VIEW_LEDGER}>
+              <Link href="/ledger">
+                <Button variant="secondary" size="md" className="gap-2">
+                  <Icon name="account_balance" />
+                  <span>عرض السجل المالي</span>
+                </Button>
+              </Link>
+            </RequirePermission>
           </div>
-          </div>
-        </RequirePermission>
-
-        {/* Invoice Table */}
-        {statement && (
-          <section className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mt-2">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">الفواتير</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      التاريخ
-                    </th>
-                    <th className="px-6 py-3.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      الحالة
-                    </th>
-                    <th className="px-6 py-3.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      المبلغ الإجمالي
-                    </th>
-                    <th className="px-6 py-3.5 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      الإجراء
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {statement.invoices.length === 0 && !isLoading && (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        className="px-6 py-8 whitespace-nowrap text-sm text-gray-500 text-center"
-                      >
-                        لا توجد فواتير لهذا العميل.
-                      </td>
-                    </tr>
-                  )}
-
-                  {statement.invoices.length === 0 && isLoading && (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        className="px-6 py-8 whitespace-nowrap text-sm text-gray-500 text-center"
-                      >
-                        جاري تحميل الفواتير...
-                      </td>
-                    </tr>
-                  )}
-
-                  {statement.invoices.length > 0 &&
-                    statement.invoices.map((invoice) => (
-                      <tr key={invoice.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4.5 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(invoice.createdAt)}
-                        </td>
-                        <td className="px-6 py-4.5 whitespace-nowrap">
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                              invoice.status,
-                            )}`}
-                          >
-                            {getStatusLabel(invoice.status)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4.5 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {formatCurrency(invoice.totalAmount)}
-                        </td>
-                        <td className="px-6 py-4.5 whitespace-nowrap text-center text-sm">
-                          {invoice.status === 'UNPAID' && (
-                            <RequirePermission permission="SETTLE_INVOICE">
-                              <button
-                                onClick={() => handleSettleInvoice(invoice.id)}
-                                disabled={
-                                  settlingInvoiceId === invoice.id ||
-                                  settlingInvoiceId !== null
-                                }
-                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {settlingInvoiceId === invoice.id
-                                  ? 'جاري التسوية...'
-                                  : 'تسوية'}
-                              </button>
-                            </RequirePermission>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-      </main>
-    </div>
+        </div>
+      </div>
+    </RequirePermission>
   )
 }
-

@@ -18,4 +18,3 @@ export class CreateInvoiceDto {
   @Type(() => CreateInvoiceItemDto)
   items: CreateInvoiceItemDto[];
 }
-

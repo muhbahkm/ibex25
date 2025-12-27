@@ -2,20 +2,107 @@ import {
   Controller,
   Post,
   Put,
+  Get,
   Body,
   HttpCode,
   HttpStatus,
   Param,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { InvoicesService } from './invoices.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { OperatorContextDto } from './dto/operator-context.dto';
 import { IssueInvoiceDto } from './dto/issue-invoice.dto';
+import { StoreScopeGuard } from '../core/store-scope.guard';
+import { PlanLimitGuard } from '../billing/guards/plan-limit.guard';
+import { BillingStatusGuard } from '../billing/guards/billing-status.guard';
+import { RateLimitGuard } from '../core/operational/guards/rate-limit.guard';
+import { WriteThrottleGuard } from '../core/operational/guards/write-throttle.guard';
 
+/**
+ * Invoices Controller
+ *
+ * S3: Protected with StoreScopeGuard to enforce tenant isolation at controller level.
+ * Additional enforcement exists at service layer (defense in depth).
+ * B1: PlanLimitGuard applied to issue endpoint for soft enforcement.
+ * B3: BillingStatusGuard applied to issue endpoint for billing status enforcement.
+ * C1: RateLimitGuard and WriteThrottleGuard applied for operational safety.
+ */
+@UseGuards(StoreScopeGuard, RateLimitGuard)
 @Controller('invoices')
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
+
+  /**
+   * Get All Invoices
+   * GET /invoices
+   *
+   * Returns all invoices for the current store.
+   * Read-only endpoint - no mutations, no side effects.
+   *
+   * Security:
+   * - Store-scoped using AuthContext.storeId (via StoreScopeGuard)
+   * - Requires VIEW_REPORTS permission (enforced in frontend)
+   *
+   * Response:
+   * {
+   *   success: true,
+   *   data: [
+   *     {
+   *       id: string,
+   *       customerName: string | null,
+   *       totalAmount: string,
+   *       status: "DRAFT" | "ISSUED" | "UNPAID" | "PAID" | "CANCELLED",
+   *       createdAt: string
+   *     }
+   *   ]
+   * }
+   */
+  @Get()
+  async findAll(@Req() request: Request) {
+    const storeId = request['storeId'] as string;
+    return this.invoicesService.findAll(storeId);
+  }
+
+  /**
+   * Get Single Invoice
+   * GET /invoices/:id
+   *
+   * Returns a single invoice by ID for the current store.
+   * Read-only endpoint - no mutations, no side effects.
+   *
+   * Security:
+   * - Store-scoped using AuthContext.storeId (via StoreScopeGuard)
+   * - Requires VIEW_REPORTS permission (enforced in frontend)
+   *
+   * Response:
+   * {
+   *   success: true,
+   *   data: {
+   *     id: string,
+   *     customerId: string | null,
+   *     customerName: string | null,
+   *     status: "DRAFT" | "ISSUED" | "UNPAID" | "PAID" | "CANCELLED",
+   *     totalAmount: string,
+   *     createdAt: string,
+   *     items: Array<{
+   *       id: string,
+   *       productId: string,
+   *       productName: string,
+   *       quantity: number,
+   *       unitPrice: string
+   *     }>
+   *   }
+   * }
+   */
+  @Get(':id')
+  async findOne(@Param('id') id: string, @Req() request: Request) {
+    const storeId = request['storeId'] as string;
+    return this.invoicesService.findOne(id, storeId);
+  }
 
   /**
    * Create Draft Invoice
@@ -80,8 +167,13 @@ export class InvoicesController {
    * - Issue is an atomic transaction
    * - Operator must belong to invoice's store
    *
+   * B1: Protected with PlanLimitGuard for soft enforcement of plan limits.
+   * B3: Protected with BillingStatusGuard to enforce billing account status.
+   * C1: Protected with WriteThrottleGuard for write operation throttling.
+   *
    * Requires operatorContext in request body.
    */
+  @UseGuards(PlanLimitGuard, BillingStatusGuard, WriteThrottleGuard)
   @Post(':invoiceId/issue')
   @HttpCode(HttpStatus.OK)
   async issue(
@@ -97,9 +189,11 @@ export class InvoicesController {
    *
    * Permission: Store manager only (conceptual - not technical role yet)
    * Attribution: settledByUserId is recorded
+   * C1: Protected with WriteThrottleGuard for write operation throttling.
    *
    * Requires operatorContext in request body.
    */
+  @UseGuards(WriteThrottleGuard)
   @Post(':invoiceId/settle')
   @HttpCode(HttpStatus.OK)
   async settle(
@@ -115,9 +209,11 @@ export class InvoicesController {
    *
    * Permission: Store manager only (conceptual - not technical role yet)
    * Attribution: cancelledByUserId is recorded
+   * C1: Protected with WriteThrottleGuard for write operation throttling.
    *
    * Requires operatorContext in request body.
    */
+  @UseGuards(WriteThrottleGuard)
   @Post(':invoiceId/cancel')
   @HttpCode(HttpStatus.OK)
   async cancel(
@@ -127,4 +223,3 @@ export class InvoicesController {
     return this.invoicesService.cancel(invoiceId, operatorContext);
   }
 }
-

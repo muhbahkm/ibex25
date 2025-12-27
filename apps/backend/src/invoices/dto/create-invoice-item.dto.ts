@@ -8,4 +8,3 @@ export class CreateInvoiceItemDto {
   @Min(1)
   quantity: number;
 }
-

@@ -12,10 +12,11 @@ export enum Role {
   AUDITOR = 'AUDITOR',
 }
 
-export type Permission =
-  | 'ISSUE_INVOICE'
-  | 'SETTLE_INVOICE'
-  | 'CANCEL_INVOICE'
-  | 'VIEW_LEDGER'
-  | 'VIEW_REPORTS';
+export enum Permission {
+  ISSUE_INVOICE = 'ISSUE_INVOICE',
+  SETTLE_INVOICE = 'SETTLE_INVOICE',
+  CANCEL_INVOICE = 'CANCEL_INVOICE',
+  VIEW_LEDGER = 'VIEW_LEDGER',
+  VIEW_REPORTS = 'VIEW_REPORTS',
+}
 

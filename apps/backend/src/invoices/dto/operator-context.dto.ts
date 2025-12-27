@@ -8,11 +8,6 @@ import { IsUUID } from 'class-validator';
  *
  * This is a temporary solution before full Auth system is implemented.
  * It enforces discipline and prevents "anyone can do anything" logic.
- *
- * ⚠️ CONTRACT: Do not change without version bump
- * - operatorId: UUID format required
- * - storeId: UUID format required
- * - This DTO is bridged to AuthContext but remains for backward compatibility
  */
 export class OperatorContextDto {
   @IsUUID()
@@ -21,4 +16,3 @@ export class OperatorContextDto {
   @IsUUID()
   storeId: string;
 }
-

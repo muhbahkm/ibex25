@@ -26,3 +26,31 @@ body {
   }
 }
 
+/* Typography System */
+@layer components {
+  /* Page Title - Large, bold heading for main page titles */
+  .text-page-title {
+    @apply text-2xl font-bold text-gray-900;
+  }
+
+  /* Section Title - Medium heading for sections */
+  .text-section-title {
+    @apply text-lg font-semibold text-gray-900;
+  }
+
+  /* Body Text - Default text for content */
+  .text-body {
+    @apply text-sm text-gray-900;
+  }
+
+  /* Muted Text - Secondary, less prominent text */
+  .text-muted {
+    @apply text-sm text-gray-500;
+  }
+
+  /* Numeric / Monetary Text - For displaying numbers and currency */
+  .text-numeric {
+    @apply text-sm font-medium text-gray-900 tabular-nums;
+  }
+}
+

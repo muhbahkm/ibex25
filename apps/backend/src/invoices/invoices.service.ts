@@ -3,20 +3,73 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
+  Inject,
+  Scope,
 } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
 import { PrismaService } from '../prisma.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { OperatorContextDto } from './dto/operator-context.dto';
 import { IssueInvoiceDto } from './dto/issue-invoice.dto';
-import { Prisma, InvoiceStatus, PaymentType, LedgerEntryType } from '@prisma/client';
+import {
+  Prisma,
+  InvoiceStatus,
+  PaymentType,
+  LedgerEntryType,
+} from '@prisma/client';
 import { InvoiceStateTransitions } from './utils/invoice-state-transitions';
 import { StoreOwnershipGuard } from './utils/store-ownership.guard';
 import { LedgerGuard } from './utils/ledger-guard';
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class InvoicesService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(InvoicesService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    @Inject(REQUEST) private request: Request,
+  ) {}
+
+  /**
+   * S3: Enforce Store Ownership with Logging
+   *
+   * This method provides defense-in-depth by validating store ownership
+   * at the service layer, even though StoreScopeGuard already validates
+   * at the controller level.
+   *
+   * The dual validation (guard + service) is a security feature, not redundancy:
+   * - Guard: Prevents unauthorized requests from reaching the service
+   * - Service: Validates ownership even if guard is bypassed or service is called directly
+   *
+   * @param invoiceStoreId - The storeId of the invoice
+   * @param operatorStoreId - The storeId from AuthContext (or operatorContext)
+   * @param operation - Description of the operation being performed
+   * @param invoiceId - The invoice ID (for logging)
+   */
+  private enforceStoreOwnership(
+    invoiceStoreId: string,
+    operatorStoreId: string,
+    operation: string,
+    invoiceId: string,
+  ): void {
+    if (invoiceStoreId !== operatorStoreId) {
+      const requestId = (this.request?.['requestId'] as string) || 'unknown';
+      this.logger.warn(
+        `[${requestId}] INVOICE_CROSS_TENANT_ACCESS: invoiceId=${invoiceId}, ` +
+          `operatorStoreId=${operatorStoreId}, invoiceStoreId=${invoiceStoreId}, operation=${operation}`,
+      );
+
+      throw new ForbiddenException({
+        message:
+          `Operation '${operation}' on invoice ${invoiceId} is forbidden. ` +
+          `Cross-tenant access denied. Operator storeId=${operatorStoreId}, Invoice storeId=${invoiceStoreId}.`,
+        code: 'INVOICE_CROSS_TENANT_ACCESS',
+      });
+    }
+  }
 
   async create(
     createInvoiceDto: CreateInvoiceDto,
@@ -188,8 +241,9 @@ export class InvoicesService {
       throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
     }
 
-    // Store Ownership Guard: Validate operator belongs to invoice's store
-    StoreOwnershipGuard.validateStoreOwnership(
+    // S3: Enforce store ownership at service layer (defense in depth)
+    // This validation runs even if StoreScopeGuard is bypassed
+    this.enforceStoreOwnership(
       invoice.storeId,
       operatorContext.storeId,
       'update draft invoice',
@@ -385,8 +439,9 @@ export class InvoicesService {
         throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
       }
 
-      // Store Ownership Guard: Validate operator belongs to invoice's store
-      StoreOwnershipGuard.validateStoreOwnership(
+      // S3: Enforce store ownership at service layer (defense in depth)
+      // This validation runs even if StoreScopeGuard is bypassed
+      this.enforceStoreOwnership(
         invoice.storeId,
         issueDto.storeId,
         'issue invoice',
@@ -449,7 +504,9 @@ export class InvoicesService {
       for (const [productId, totalQuantity] of productQuantities.entries()) {
         const item = invoice.items.find((i) => i.productId === productId);
         if (!item) {
-          throw new NotFoundException(`Product not found in invoice: ${productId}`);
+          throw new NotFoundException(
+            `Product not found in invoice: ${productId}`,
+          );
         }
 
         const product = item.product;
@@ -563,12 +620,13 @@ export class InvoicesService {
         },
       });
 
-    if (!invoice) {
-      throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
-    }
+      if (!invoice) {
+        throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
+      }
 
-      // Store Ownership Guard: Validate operator belongs to invoice's store
-      StoreOwnershipGuard.validateStoreOwnership(
+      // S3: Enforce store ownership at service layer (defense in depth)
+      // This validation runs even if StoreScopeGuard is bypassed
+      this.enforceStoreOwnership(
         invoice.storeId,
         operatorContext.storeId,
         'settle invoice',
@@ -677,8 +735,9 @@ export class InvoicesService {
       throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
     }
 
-    // Store Ownership Guard: Validate operator belongs to invoice's store
-    StoreOwnershipGuard.validateStoreOwnership(
+    // S3: Enforce store ownership at service layer (defense in depth)
+    // This validation runs even if StoreScopeGuard is bypassed
+    this.enforceStoreOwnership(
       invoice.storeId,
       operatorContext.storeId,
       'cancel invoice',
@@ -727,5 +786,109 @@ export class InvoicesService {
       cancelledAt: new Date().toISOString(),
     };
   }
-}
 
+  /**
+   * Get All Invoices
+   *
+   * Read-only method to fetch all invoices for a store.
+   * No business logic, no side effects, no mutations.
+   *
+   * @param storeId - Store ID (from AuthContext via StoreScopeGuard)
+   * @returns Array of invoices with minimal fields
+   */
+  async findAll(storeId: string) {
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        storeId,
+      },
+      select: {
+        id: true,
+        totalAmount: true,
+        status: true,
+        createdAt: true,
+        customer: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // Transform to response shape
+    return invoices.map((invoice) => ({
+      id: invoice.id,
+      customerName: invoice.customer?.name || null,
+      totalAmount: invoice.totalAmount.toString(),
+      status: invoice.status,
+      createdAt: invoice.createdAt.toISOString(),
+    }));
+  }
+
+  /**
+   * Get Single Invoice
+   *
+   * Read-only method to fetch a single invoice by ID for a store.
+   * No business logic, no side effects, no mutations.
+   *
+   * @param invoiceId - Invoice ID
+   * @param storeId - Store ID (from AuthContext via StoreScopeGuard)
+   * @returns Invoice with items and product details
+   */
+  async findOne(invoiceId: string, storeId: string) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: {
+        id: invoiceId,
+        storeId,
+      },
+      select: {
+        id: true,
+        customerId: true,
+        status: true,
+        totalAmount: true,
+        createdAt: true,
+        customer: {
+          select: {
+            name: true,
+          },
+        },
+        items: {
+          select: {
+            id: true,
+            productId: true,
+            quantity: true,
+            unitPrice: true,
+            product: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException(`Invoice with ID ${invoiceId} not found`);
+    }
+
+    // Transform to response shape
+    return {
+      id: invoice.id,
+      customerId: invoice.customerId,
+      customerName: invoice.customer?.name || null,
+      status: invoice.status,
+      totalAmount: invoice.totalAmount.toString(),
+      createdAt: invoice.createdAt.toISOString(),
+      items: invoice.items.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        productName: item.product.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice.toString(),
+      })),
+    };
+  }
+}

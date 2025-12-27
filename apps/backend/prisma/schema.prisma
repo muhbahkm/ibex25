@@ -17,6 +17,7 @@ model Store {
   users         User[]
   payments      Payment[]
   ledgerEntries LedgerEntry[]
+  auditLogs     AuditLog[]
 
   @@map("stores")
 }
@@ -140,4 +141,120 @@ model LedgerEntry {
   invoice   Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@map("ledger_entries")
+}
+
+// Audit Log Model - Immutable audit trail of all critical operations
+model AuditLog {
+  id         String   @id @default(uuid())
+  storeId   String
+  userId    String
+  action    String
+  entityType String
+  entityId  String
+  metadata  Json?
+  createdAt DateTime  @default(now())
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
+
+// Plan Model - B1: Subscription plan definitions (B2: Extended with pricing relation, B3: Extended with billing accounts)
+model Plan {
+  id          String              @id @default(uuid())
+  code        String              @unique
+  name        String
+  description String?
+  limits      Json                // e.g. { invoicesPerMonth: 500, users: 3 }
+  features    Json                // e.g. { ledger: true, reports: true }
+  createdAt   DateTime            @default(now())
+  subscriptions StoreSubscription[]
+  pricing     PlanPricing[]
+  billingAccounts BillingAccount[]
+
+  @@map("plans")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+// BillingCycle Enum - B2: Defines billing cycle options (MONTHLY, YEARLY)
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+// SubscriptionState Enum - B3: Internal billing state (provider-agnostic)
+enum SubscriptionState {
+  ACTIVE
+  PAST_DUE
+  GRACE
+  SUSPENDED
+  CANCELLED
+}
+
+// BillingProvider Enum - B3: External billing provider types
+enum BillingProvider {
+  STRIPE
+  MANUAL
+  NONE
+}
+
+
+// PlanPricing Model - B2: Pricing definitions for plans (READ-ONLY, no enforcement)
+model PlanPricing {
+  id          String        @id @default(uuid())
+  planId      String
+  billingCycle BillingCycle
+  priceCents  Int           // Price in cents (no decimals)
+  currency    String        // e.g. "USD"
+  createdAt   DateTime      @default(now())
+  plan        Plan          @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, billingCycle])
+  @@map("plan_pricing")
+}
+
+// Store Subscription Model - B1: Links Store to Plan (FOUNDATION ONLY: No billing cycles, no expiration)
+model StoreSubscription {
+  id        String              @id @default(uuid())
+  storeId   String              @unique
+  planId    String
+  startedAt DateTime            @default(now())
+  status    SubscriptionStatus  @default(ACTIVE)
+  plan      Plan                @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@map("store_subscriptions")
+}
+
+// BillingAccount Model - B3: Internal billing control layer (source of truth)
+model BillingAccount {
+  id            String              @id @default(uuid())
+  storeId       String              @unique
+  currentPlanId String
+  status        SubscriptionState   @default(ACTIVE)
+  billingState  Json?               // Internal state metadata (provider-agnostic)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  plan          Plan                @relation(fields: [currentPlanId], references: [id], onDelete: Restrict)
+  externalRef   ExternalBillingRef?
+
+  @@map("billing_accounts")
+}
+
+// ExternalBillingRef Model - B3: Links internal billing to external provider (Stripe, etc.)
+model ExternalBillingRef {
+  id                    String          @id @default(uuid())
+  billingAccountId      String          @unique
+  provider              BillingProvider @default(NONE)
+  externalCustomerId    String?
+  externalSubscriptionId String?
+  syncStatus            String?         // e.g. "SYNCED", "PENDING", "ERROR"
+  lastSyncedAt          DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  billingAccount        BillingAccount  @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+
+  @@map("external_billing_refs")
 }

@@ -1,3 +1,5 @@
+import { handleApiError, extractErrorMessage } from './error-handler'
+
 export interface CustomerSummary {
   id: string
   name: string
@@ -66,7 +68,7 @@ export async function fetchCustomers(): Promise<CustomerSummary[]> {
   })
 
   if (!res.ok) {
-    throw new Error('تعذر جلب قائمة العملاء من الخادم.')
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as CustomersResponse
@@ -94,7 +96,7 @@ export async function fetchCustomerStatement(
   })
 
   if (!res.ok) {
-    throw new Error('تعذر جلب بيانات العميل من الخادم.')
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as StatementResponse
@@ -104,7 +106,7 @@ export async function fetchCustomerStatement(
     throw new Error(message)
   }
 
-  return body.data
+  return body.data as CustomerStatement
 }
 
 interface SettleResponse {
@@ -121,7 +123,12 @@ interface SettleResponse {
   }
 }
 
-export async function settleInvoice(invoiceId: string): Promise<void> {
+export async function settleInvoice(
+  invoiceId: string,
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<void> {
   const baseUrl = getApiBaseUrl()
   const url = `${baseUrl}/invoices/${invoiceId}/settle`
 
@@ -129,14 +136,21 @@ export async function settleInvoice(invoiceId: string): Promise<void> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
     },
+    body: JSON.stringify({
+      operatorContext: {
+        operatorId: userId,
+        storeId: storeId,
+      },
+    }),
     cache: 'no-store',
   })
 
   if (!res.ok) {
-    const body = (await res.json()) as SettleResponse
-    const message = body.error?.message || 'فشل تسوية الفاتورة.'
-    throw new Error(message)
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as SettleResponse
@@ -145,6 +159,56 @@ export async function settleInvoice(invoiceId: string): Promise<void> {
     const message = body.error?.message || 'فشل تسوية الفاتورة.'
     throw new Error(message)
   }
+}
+
+export interface Invoice {
+  id: string
+  customerName: string | null
+  totalAmount: string
+  status: 'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED'
+  createdAt: string
+}
+
+interface InvoicesResponse {
+  success: boolean
+  data?: Invoice[]
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchInvoices(
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<Invoice[]> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/invoices`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    await handleApiError(res)
+  }
+
+  const body = (await res.json()) as InvoicesResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب قائمة الفواتير.'
+    throw new Error(message)
+  }
+
+  return body.data
 }
 
 export interface LedgerEntry {
@@ -166,6 +230,8 @@ interface LedgerResponse {
 export async function fetchLedgerEntries(
   storeId: string,
   operatorId: string,
+  userId: string,
+  role: string,
   fromDate?: string,
   toDate?: string,
 ): Promise<LedgerEntry[]> {
@@ -189,12 +255,15 @@ export async function fetchLedgerEntries(
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
     },
     cache: 'no-store',
   })
 
   if (!res.ok) {
-    throw new Error('تعذر جلب بيانات السجل المالي من الخادم.')
+    await handleApiError(res)
   }
 
   const body = (await res.json()) as LedgerResponse | LedgerEntry[]
@@ -208,6 +277,582 @@ export async function fetchLedgerEntries(
 
   if (!body.success || !body.data) {
     const message = body.error?.message || 'فشل جلب بيانات السجل المالي.'
+    throw new Error(message)
+  }
+
+  return body.data
+}
+
+// Reports API
+export interface ProfitLossReport {
+  totalSales: number
+  totalReceipts: number
+  netRevenue: number
+}
+
+interface ProfitLossResponse {
+  success: boolean
+  data?: ProfitLossReport
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchProfitLossReport(
+  storeId: string,
+  operatorId: string,
+  userId: string,
+  role: string,
+  fromDate?: string,
+  toDate?: string,
+): Promise<ProfitLossReport> {
+  const baseUrl = getApiBaseUrl()
+  const params = new URLSearchParams({
+    storeId,
+    operatorId,
+  })
+
+  if (fromDate) {
+    params.append('fromDate', fromDate)
+  }
+
+  if (toDate) {
+    params.append('toDate', toDate)
+  }
+
+  const url = `${baseUrl}/reports/profit-loss?${params.toString()}`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    await handleApiError(res)
+  }
+
+  const body = (await res.json()) as ProfitLossResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب بيانات التقرير.'
+    throw new Error(message)
+  }
+
+  return body.data
+}
+
+// Helper function to get auth headers from user context
+export function getAuthHeaders(userId: string, storeId: string, role: string) {
+  return {
+    'x-user-id': userId,
+    'x-store-id': storeId,
+    'x-role': role,
+  }
+}
+
+// Products API
+export interface Product {
+  id: string
+  name: string
+  price: string
+}
+
+interface ProductsResponse {
+  success: boolean
+  data?: Product[]
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchProducts(
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<Product[]> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/products`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    await handleApiError(res)
+  }
+
+  const body = (await res.json()) as ProductsResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب قائمة المنتجات.'
+    throw new Error(message)
+  }
+
+  return body.data
+}
+
+// Invoice Detail API
+export interface InvoiceDetail {
+  id: string
+  customerId: string | null
+  customerName: string | null
+  status: 'DRAFT' | 'ISSUED' | 'UNPAID' | 'PAID' | 'CANCELLED'
+  totalAmount: string
+  createdAt: string
+  paymentType?: string | null
+  items: Array<{
+    id: string
+    productId: string
+    productName: string
+    quantity: number
+    unitPrice: string
+  }>
+}
+
+interface InvoiceDetailResponse {
+  success: boolean
+  data?: InvoiceDetail
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchInvoice(
+  invoiceId: string,
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<InvoiceDetail> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/invoices/${invoiceId}`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    await handleApiError(res)
+  }
+
+  const body = (await res.json()) as InvoiceDetailResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب بيانات الفاتورة.'
+    throw new Error(message)
+  }
+
+  return body.data
+}
+
+// Create Invoice API
+interface CreateInvoiceRequest {
+  storeId: string
+  createdBy: string
+  customerId: string | null
+  items: Array<{
+    productId: string
+    quantity: number
+  }>
+  operatorContext: {
+    operatorId: string
+    storeId: string
+  }
+}
+
+interface CreateInvoiceResponse {
+  success: boolean
+  data?: {
+    id: string
+    status: string
+    [key: string]: unknown
+  }
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function createInvoice(
+  customerId: string | null,
+  items: Array<{ productId: string; quantity: number }>,
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<string> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/invoices`
+
+  const body: CreateInvoiceRequest = {
+    storeId,
+    createdBy: userId,
+    customerId,
+    items,
+    operatorContext: {
+      operatorId: userId,
+      storeId,
+    },
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    await handleApiError(res)
+  }
+
+  const responseBody = (await res.json()) as CreateInvoiceResponse
+
+  if (!responseBody.success || !responseBody.data) {
+    const message = responseBody.error?.message || 'فشل إنشاء الفاتورة.'
+    throw new Error(message)
+  }
+
+  return responseBody.data.id
+}
+
+// Update Invoice Draft API
+interface UpdateInvoiceDraftRequest {
+  customerId?: string | null
+  items?: Array<{
+    productId: string
+    quantity: number
+  }>
+  operatorContext: {
+    operatorId: string
+    storeId: string
+  }
+}
+
+interface UpdateInvoiceDraftResponse {
+  success: boolean
+  data?: {
+    id: string
+    [key: string]: unknown
+  }
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function updateInvoiceDraft(
+  invoiceId: string,
+  customerId: string | null | undefined,
+  items: Array<{ productId: string; quantity: number }> | undefined,
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<void> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/invoices/${invoiceId}/draft`
+
+  const body: UpdateInvoiceDraftRequest = {
+    operatorContext: {
+      operatorId: userId,
+      storeId,
+    },
+  }
+
+  if (customerId !== undefined) {
+    body.customerId = customerId
+  }
+
+  if (items !== undefined) {
+    body.items = items
+  }
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    await handleApiError(res)
+  }
+
+  const responseBody = (await res.json()) as UpdateInvoiceDraftResponse
+
+  if (!responseBody.success) {
+    const message = responseBody.error?.message || 'فشل تحديث الفاتورة.'
+    throw new Error(message)
+  }
+}
+
+// Issue Invoice API
+interface IssueInvoiceRequest {
+  paymentType: 'CASH' | 'CREDIT'
+  operatorId: string
+  storeId: string
+}
+
+interface IssueInvoiceResponse {
+  success: boolean
+  data?: {
+    id: string
+    status: 'PAID' | 'UNPAID'
+    previousStatus: string
+    issuedAt: string
+    paymentType: 'CASH' | 'CREDIT'
+    [key: string]: unknown
+  }
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function issueInvoice(
+  invoiceId: string,
+  paymentType: 'CASH' | 'CREDIT',
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<void> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/invoices/${invoiceId}/issue`
+
+  const body: IssueInvoiceRequest = {
+    paymentType,
+    operatorId: userId,
+    storeId,
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    await handleApiError(res)
+  }
+
+  const responseBody = (await res.json()) as IssueInvoiceResponse
+
+  if (!responseBody.success) {
+    const message = responseBody.error?.message || 'فشل إصدار الفاتورة.'
+    throw new Error(message)
+  }
+}
+
+// Cancel Invoice API
+interface CancelInvoiceRequest {
+  operatorId: string
+  storeId: string
+}
+
+interface CancelInvoiceResponse {
+  success: boolean
+  data?: {
+    id: string
+    status: 'CANCELLED'
+    previousStatus: string
+    cancelledAt: string
+    [key: string]: unknown
+  }
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function cancelInvoice(
+  invoiceId: string,
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<void> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/invoices/${invoiceId}/cancel`
+
+  const body: CancelInvoiceRequest = {
+    operatorId: userId,
+    storeId,
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    body: JSON.stringify({
+      operatorContext: body,
+    }),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    await handleApiError(res)
+  }
+
+  const responseBody = (await res.json()) as CancelInvoiceResponse
+
+  if (!responseBody.success) {
+    const message = responseBody.error?.message || 'فشل إلغاء الفاتورة.'
+    throw new Error(message)
+  }
+}
+
+// B1: Billing API
+export interface StorePlan {
+  plan: {
+    code: string
+    name: string
+    description?: string
+  }
+  limits: {
+    invoicesPerMonth?: number
+    users?: number
+    [key: string]: number | undefined
+  }
+  features: {
+    ledger?: boolean
+    reports?: boolean
+    [key: string]: boolean | undefined
+  }
+  usage: {
+    invoicesThisMonth: number
+    usersCount: number
+    [key: string]: number
+  }
+}
+
+interface BillingResponse {
+  success: boolean
+  data?: StorePlan
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchStorePlan(
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<StorePlan> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/billing/plan`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    await handleApiError(res)
+  }
+
+  const body = (await res.json()) as BillingResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب معلومات الخطة.'
+    throw new Error(message)
+  }
+
+  return body.data
+}
+
+// B2: Pricing API
+export interface StorePricing {
+  plan: string
+  pricing: Array<{
+    cycle: 'MONTHLY' | 'YEARLY'
+    priceCents: number
+    currency: string
+  }>
+}
+
+interface PricingResponse {
+  success: boolean
+  data?: StorePricing
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchStorePricing(
+  userId: string,
+  storeId: string,
+  role: string,
+): Promise<StorePricing> {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/billing/pricing`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      'x-store-id': storeId,
+      'x-role': role,
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    await handleApiError(res)
+  }
+
+  const body = (await res.json()) as PricingResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب معلومات الأسعار.'
     throw new Error(message)
   }
 
