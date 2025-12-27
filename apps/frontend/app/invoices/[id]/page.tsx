@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { RequirePermission } from '@/auth/RequirePermission'
+import { Permission } from '@/auth/roles'
 import { useAuth } from '@/auth/useAuth'
 import { fetchInvoice, settleInvoice, InvoiceDetail } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/format'
@@ -104,7 +105,7 @@ export default function InvoiceDetailsPage() {
 
   if (isLoading) {
     return (
-      <RequirePermission permission="VIEW_REPORTS">
+      <RequirePermission permission={Permission.VIEW_REPORTS}>
         <div className="max-w-4xl mx-auto">
           <LoadingState message="جاري تحميل بيانات الفاتورة..." />
         </div>
@@ -114,7 +115,7 @@ export default function InvoiceDetailsPage() {
 
   if (!invoice) {
     return (
-      <RequirePermission permission="VIEW_REPORTS">
+      <RequirePermission permission={Permission.VIEW_REPORTS}>
         <div className="max-w-4xl mx-auto space-y-4">
           <ErrorMessage message={error || 'الفاتورة غير موجودة.'} />
           <Link
@@ -134,7 +135,7 @@ export default function InvoiceDetailsPage() {
   }
 
   return (
-    <RequirePermission permission="VIEW_REPORTS">
+    <RequirePermission permission={Permission.VIEW_REPORTS}>
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Page Header */}
         <div className="flex items-center justify-between">
@@ -257,7 +258,7 @@ export default function InvoiceDetailsPage() {
               </Link>
             )}
             {invoice.status === 'UNPAID' && (
-              <RequirePermission permission="SETTLE_INVOICE">
+              <RequirePermission permission={Permission.SETTLE_INVOICE}>
                 <Button
                   variant="primary"
                   size="md"

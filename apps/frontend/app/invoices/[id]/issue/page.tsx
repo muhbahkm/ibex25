@@ -3,9 +3,24 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { RequirePermission } from '@/auth/RequirePermission'
+import { Permission } from '@/auth/roles'
 import { useAuth } from '@/auth/useAuth'
 import { fetchInvoice, issueInvoice, InvoiceDetail } from '@/lib/api'
 import { formatCurrency } from '@/lib/format'
+import {
+  Button,
+  LoadingState,
+  EmptyState,
+  ErrorMessage,
+  StatusBadge,
+  Table,
+  TableHeader,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+} from '@/components/ui'
+import Icon from '@/components/Icon'
 
 export default function IssueInvoicePage() {
   const router = useRouter()
@@ -100,13 +115,9 @@ export default function IssueInvoicePage() {
 
   if (isLoading) {
     return (
-      <RequirePermission permission="ISSUE_INVOICE">
-        <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center py-12">
-              <p className="text-gray-500">جاري التحميل...</p>
-            </div>
-          </div>
+      <RequirePermission permission={Permission.ISSUE_INVOICE}>
+        <div className="max-w-4xl mx-auto">
+          <LoadingState message="جاري تحميل بيانات الفاتورة..." />
         </div>
       </RequirePermission>
     )
@@ -114,15 +125,13 @@ export default function IssueInvoicePage() {
 
   if (!invoice) {
     return (
-      <RequirePermission permission="ISSUE_INVOICE">
-        <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-800">
-                {error || 'الفاتورة غير موجودة.'}
-              </p>
-            </div>
-          </div>
+      <RequirePermission permission={Permission.ISSUE_INVOICE}>
+        <div className="max-w-4xl mx-auto space-y-4">
+          <ErrorMessage message={error || 'الفاتورة غير موجودة.'} />
+          <Button variant="secondary" size="md" onClick={() => router.push('/invoices')}>
+            <Icon name="arrow_back" />
+            <span>العودة إلى القائمة</span>
+          </Button>
         </div>
       </RequirePermission>
     )
@@ -130,27 +139,22 @@ export default function IssueInvoicePage() {
 
   if (invoice.status !== 'DRAFT') {
     return (
-      <RequirePermission permission="ISSUE_INVOICE">
-        <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold text-gray-900">
-                إصدار الفاتورة
-              </h1>
-            </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-sm text-yellow-800">
-                لا يمكن إصدار فاتورة غير مسودة
-              </p>
-            </div>
-            <div className="mt-4">
-              <button
-                onClick={() => router.push('/invoices')}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                العودة إلى القائمة
-              </button>
-            </div>
+      <RequirePermission permission={Permission.ISSUE_INVOICE}>
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div>
+            <h1 className="text-page-title mb-2">إصدار الفاتورة</h1>
+            <p className="text-muted">الفاتورة #{invoice.id}</p>
+          </div>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-body text-yellow-800">
+              لا يمكن إصدار فاتورة غير مسودة. الفواتير المصدرة لا يمكن إعادة إصدارها.
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="secondary" size="md" onClick={() => router.push('/invoices')}>
+              <Icon name="arrow_back" />
+              <span>العودة إلى القائمة</span>
+            </Button>
           </div>
         </div>
       </RequirePermission>
@@ -162,156 +166,152 @@ export default function IssueInvoicePage() {
   }
 
   return (
-    <RequirePermission permission="ISSUE_INVOICE">
-      <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">إصدار الفاتورة</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              الحالة: <span className="font-medium"> مسودة</span>
-            </p>
+    <RequirePermission permission={Permission.ISSUE_INVOICE}>
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Page Header */}
+        <div>
+          <h1 className="text-page-title mb-2">إصدار الفاتورة</h1>
+          <div className="flex items-center gap-4">
+            <p className="text-muted">الفاتورة #{invoice.id}</p>
+            <StatusBadge status={invoice.status} />
           </div>
+        </div>
 
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
+        {/* Error State */}
+        {error && <ErrorMessage message={error} />}
 
-          {/* Warning Message */}
-          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-sm text-yellow-800">
-              ⚠️ إصدار هذه الفاتورة سيؤدي إلى قفلها ولن يمكن تعديلها بعد ذلك.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            {/* Customer */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                العميل
-              </label>
-              <p className="text-sm text-gray-900">
-                {invoice.customerName || 'عميل نقدي'}
+        {/* Critical Warning */}
+        <div className="bg-danger-50 border border-danger-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Icon name="warning" className="text-danger-600 text-xl flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-body font-semibold text-danger-900 mb-1">
+                تحذير: إجراء نهائي
+              </p>
+              <p className="text-body text-danger-800">
+                إصدار هذه الفاتورة سيؤدي إلى قفلها بشكل دائم. لن يمكن تعديلها أو حذفها بعد الإصدار. 
+                سيتم خصم المخزون وإنشاء سجل مالي. تأكد من صحة جميع البيانات قبل المتابعة.
               </p>
             </div>
+          </div>
+        </div>
 
-            {/* Invoice Items */}
-            <div className="mb-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
-                العناصر
-              </h2>
-              {invoice.items.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  لا توجد عناصر
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          المنتج
-                        </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          الكمية
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          سعر الوحدة
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          الإجمالي
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {invoice.items.map((item) => (
-                        <tr key={item.id}>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.productName}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.quantity}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatCurrency(Number(item.unitPrice))} ر.س
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {formatCurrency(
-                              calculateLineTotal(item.quantity, item.unitPrice),
-                            )}{' '}
-                            ر.س
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+        {/* Invoice Review Card */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
+          {/* Customer */}
+          <div className="p-6">
+            <label className="block text-xs font-medium text-gray-500 mb-2">
+              العميل
+            </label>
+            <p className="text-body">{invoice.customerName || 'عميل نقدي'}</p>
+          </div>
+
+          {/* Invoice Items */}
+          <div className="p-6">
+            <h2 className="text-section-title mb-4">العناصر</h2>
+            {invoice.items.length === 0 ? (
+              <EmptyState message="لا توجد عناصر" />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableHeaderCell align="right">المنتج</TableHeaderCell>
+                  <TableHeaderCell align="right">الكمية</TableHeaderCell>
+                  <TableHeaderCell align="left">سعر الوحدة</TableHeaderCell>
+                  <TableHeaderCell align="left">الإجمالي</TableHeaderCell>
+                </TableHeader>
+                <TableBody>
+                  {invoice.items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell align="right">
+                        <span className="text-body">{item.productName}</span>
+                      </TableCell>
+                      <TableCell align="right">
+                        <span className="text-body">{item.quantity}</span>
+                      </TableCell>
+                      <TableCell align="left">
+                        <span className="text-numeric">
+                          {formatCurrency(Number(item.unitPrice))} ر.س
+                        </span>
+                      </TableCell>
+                      <TableCell align="left">
+                        <span className="text-numeric">
+                          {formatCurrency(
+                            calculateLineTotal(item.quantity, item.unitPrice),
+                          )}{' '}
+                          ر.س
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
+          {/* Total */}
+          <div className="p-6 bg-gray-50">
+            <div className="flex justify-between items-center">
+              <span className="text-section-title">الإجمالي:</span>
+              <span className="text-section-title text-numeric">
+                {formatCurrency(Number(invoice.totalAmount))} ر.س
+              </span>
             </div>
+          </div>
 
-            {/* Total */}
-            <div className="mb-6 border-t border-gray-200 pt-4">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-medium text-gray-900">
-                  الإجمالي:
-                </span>
-                <span className="text-lg font-bold text-gray-900">
-                  {formatCurrency(Number(invoice.totalAmount))} ر.س
-                </span>
-              </div>
-            </div>
-
-            {/* Payment Type Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                نوع الدفع <span className="text-red-500">*</span>
+          {/* Payment Type Selection */}
+          <div className="p-6">
+            <label className="block text-xs font-medium text-gray-500 mb-3">
+              نوع الدفع <span className="text-danger-600">*</span>
+            </label>
+            <div className="space-y-3">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="paymentType"
+                  value="CASH"
+                  checked={paymentType === 'CASH'}
+                  onChange={(e) => setPaymentType(e.target.value as 'CASH')}
+                  className="ml-3 h-4 w-4 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-body">نقدي</span>
               </label>
-              <div className="space-y-2">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="paymentType"
-                    value="CASH"
-                    checked={paymentType === 'CASH'}
-                    onChange={(e) => setPaymentType(e.target.value as 'CASH')}
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-gray-900">نقدي</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="paymentType"
-                    value="CREDIT"
-                    checked={paymentType === 'CREDIT'}
-                    onChange={(e) =>
-                      setPaymentType(e.target.value as 'CREDIT')
-                    }
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-gray-900">آجل</span>
-                </label>
-              </div>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="paymentType"
+                  value="CREDIT"
+                  checked={paymentType === 'CREDIT'}
+                  onChange={(e) =>
+                    setPaymentType(e.target.value as 'CREDIT')
+                  }
+                  className="ml-3 h-4 w-4 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-body">آجل</span>
+              </label>
             </div>
+          </div>
 
-            {/* Actions */}
-            <div className="flex justify-end gap-4">
-              <button
-                onClick={handleCancel}
-                disabled={isIssuing}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={handleIssue}
-                disabled={isIssuing || !paymentType}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isIssuing ? 'جاري الإصدار...' : 'تأكيد الإصدار'}
-              </button>
-            </div>
+          {/* Actions */}
+          <div className="p-6 flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={handleCancel}
+              disabled={isIssuing}
+            >
+              إلغاء
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleIssue}
+              disabled={isIssuing || !paymentType}
+              isLoading={isIssuing}
+              className="gap-2"
+            >
+              {!isIssuing && <Icon name="check_circle" />}
+              <span>تأكيد الإصدار</span>
+            </Button>
           </div>
         </div>
       </div>

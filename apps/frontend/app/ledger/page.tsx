@@ -2,9 +2,23 @@
 
 import { useEffect, useState } from 'react'
 import { RequirePermission } from '@/auth/RequirePermission'
+import { Permission } from '@/auth/roles'
 import { useAuth } from '@/auth/useAuth'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { fetchLedgerEntries, LedgerEntry } from '@/lib/api'
+import {
+  Button,
+  Table,
+  TableHeader,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+  LoadingState,
+  EmptyState,
+  ErrorMessage,
+} from '@/components/ui'
+import Icon from '@/components/Icon'
 
 /**
  * Get Arabic label for ledger entry type
@@ -67,11 +81,22 @@ export default function LedgerPage() {
 
   useEffect(() => {
     loadLedgerEntries()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.storeId, user.id])
 
   const handleFilter = (e: React.FormEvent) => {
     e.preventDefault()
     loadLedgerEntries()
+  }
+
+  const handleClearFilters = () => {
+    setFromDate('')
+    setToDate('')
+    // Reload with empty dates - loadLedgerEntries will use the updated state
+    // We need to wait for state update, so use setTimeout
+    setTimeout(() => {
+      loadLedgerEntries()
+    }, 0)
   }
 
   const handleExportCSV = async () => {
@@ -134,149 +159,148 @@ export default function LedgerPage() {
   }
 
   return (
-    <RequirePermission permission="VIEW_LEDGER">
-      <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Page Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">
-              سجل الحركات المالية
-            </h1>
-            <p className="mt-1 text-sm text-gray-500">
-              عرض جميع الحركات المالية (مبيعات و تحصيلات)
+    <RequirePermission permission={Permission.VIEW_LEDGER}>
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Page Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-page-title mb-2">سجل الحركات المالية</h1>
+            <p className="text-muted">
+              عرض جميع الحركات المالية (مبيعات و تحصيلات) في المتجر
             </p>
           </div>
-
-          {/* Error State */}
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
-
-          {/* Date Range Filter */}
-          <div className="mb-4 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <form onSubmit={handleFilter} className="flex flex-wrap gap-4 items-end">
-              <div className="flex-1 min-w-[200px]">
-                <label
-                  htmlFor="fromDate"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  من تاريخ
-                </label>
-                <input
-                  type="date"
-                  id="fromDate"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <label
-                  htmlFor="toDate"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  إلى تاريخ
-                </label>
-                <input
-                  type="date"
-                  id="toDate"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? 'جاري التحميل...' : 'تصفية'}
-                </button>
-                {(fromDate || toDate) && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setFromDate('')
-                      setToDate('')
-                      // Refetch with cleared dates
-                      await loadLedgerEntries()
-                    }}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                  >
-                    مسح
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleExportCSV}
-                  disabled={isLoading}
-                  className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  تصدير CSV
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Ledger Table */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      التاريخ
-                    </th>
-                    <th className="px-6 py-3.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      النوع
-                    </th>
-                    <th className="px-6 py-3.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      المبلغ
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {isLoading ? (
-                    <tr>
-                      <td
-                        colSpan={3}
-                        className="px-6 py-8 whitespace-nowrap text-sm text-gray-500 text-center"
-                      >
-                        جاري تحميل البيانات...
-                      </td>
-                    </tr>
-                  ) : entries.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={3}
-                        className="px-6 py-8 whitespace-nowrap text-sm text-gray-500 text-center"
-                      >
-                        لا توجد حركات مالية
-                      </td>
-                    </tr>
-                  ) : (
-                    entries.map((entry) => (
-                      <tr key={entry.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(entry.createdAt)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {getTypeLabel(entry.type)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {formatCurrency(entry.amount)} ر.س
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
+
+        {/* Error State */}
+        {error && <ErrorMessage message={error} />}
+
+        {/* Filters and Actions */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <form onSubmit={handleFilter} className="flex flex-wrap items-end gap-4">
+            <div className="flex-1 min-w-[200px]">
+              <label
+                htmlFor="fromDate"
+                className="block text-xs font-medium text-gray-500 mb-2"
+              >
+                من تاريخ
+              </label>
+              <input
+                type="date"
+                id="fromDate"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-body"
+              />
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <label
+                htmlFor="toDate"
+                className="block text-xs font-medium text-gray-500 mb-2"
+              >
+                إلى تاريخ
+              </label>
+              <input
+                type="date"
+                id="toDate"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-body"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                disabled={isLoading}
+                isLoading={isLoading}
+                className="gap-2"
+              >
+                {!isLoading && <Icon name="filter_list" />}
+                <span>تصفية</span>
+              </Button>
+              {(fromDate || toDate) && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  onClick={handleClearFilters}
+                  disabled={isLoading}
+                  className="gap-2"
+                >
+                  <Icon name="clear" />
+                  <span>مسح</span>
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={handleExportCSV}
+                disabled={isLoading}
+                className="gap-2"
+              >
+                <Icon name="download" />
+                <span>تصدير CSV</span>
+              </Button>
+            </div>
+          </form>
+        </div>
+
+        {/* Ledger Table */}
+        {isLoading ? (
+          <Table>
+            <TableBody>
+              <TableRow>
+                <TableCell colSpan={3} align="center" className="py-12">
+                  <LoadingState message="جاري تحميل بيانات السجل المالي..." />
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        ) : entries.length === 0 ? (
+          <Table>
+            <TableBody>
+              <TableRow>
+                <TableCell colSpan={3} align="center" className="py-12">
+                  <EmptyState
+                    message="لا توجد حركات مالية"
+                    description={
+                      fromDate || toDate
+                        ? 'لا توجد حركات مالية في الفترة المحددة'
+                        : 'لم يتم تسجيل أي حركات مالية حتى الآن'
+                    }
+                  />
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableHeaderCell align="right">التاريخ</TableHeaderCell>
+              <TableHeaderCell align="right">النوع</TableHeaderCell>
+              <TableHeaderCell align="left">المبلغ</TableHeaderCell>
+            </TableHeader>
+            <TableBody>
+              {entries.map((entry) => (
+                <TableRow key={entry.id}>
+                  <TableCell align="right">
+                    <span className="text-body">{formatDate(entry.createdAt)}</span>
+                  </TableCell>
+                  <TableCell align="right">
+                    <span className="text-body">{getTypeLabel(entry.type)}</span>
+                  </TableCell>
+                  <TableCell align="left">
+                    <span className="text-numeric">
+                      {formatCurrency(entry.amount)} ر.س
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     </RequirePermission>
   )

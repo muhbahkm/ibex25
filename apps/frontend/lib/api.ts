@@ -278,6 +278,66 @@ export async function fetchLedgerEntries(
   return body.data
 }
 
+// Reports API
+export interface ProfitLossReport {
+  totalSales: number
+  totalReceipts: number
+  netRevenue: number
+}
+
+interface ProfitLossResponse {
+  success: boolean
+  data?: ProfitLossReport
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+export async function fetchProfitLossReport(
+  storeId: string,
+  operatorId: string,
+  fromDate?: string,
+  toDate?: string,
+): Promise<ProfitLossReport> {
+  const baseUrl = getApiBaseUrl()
+  const params = new URLSearchParams({
+    storeId,
+    operatorId,
+  })
+
+  if (fromDate) {
+    params.append('fromDate', fromDate)
+  }
+
+  if (toDate) {
+    params.append('toDate', toDate)
+  }
+
+  const url = `${baseUrl}/reports/profit-loss?${params.toString()}`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    throw new Error('تعذر جلب بيانات التقرير من الخادم.')
+  }
+
+  const body = (await res.json()) as ProfitLossResponse
+
+  if (!body.success || !body.data) {
+    const message = body.error?.message || 'فشل جلب بيانات التقرير.'
+    throw new Error(message)
+  }
+
+  return body.data
+}
+
 // Products API
 export interface Product {
   id: string

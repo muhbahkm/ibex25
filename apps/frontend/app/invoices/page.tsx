@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { RequirePermission } from '@/auth/RequirePermission'
+import { Permission } from '@/auth/roles'
 import { useAuth } from '@/auth/useAuth'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { fetchInvoices, Invoice, settleInvoice } from '@/lib/api'
@@ -88,7 +89,7 @@ export default function InvoicesPage() {
   }
 
   return (
-    <RequirePermission permission="VIEW_REPORTS">
+    <RequirePermission permission={Permission.VIEW_REPORTS}>
       <div className="max-w-7xl mx-auto">
         {/* Page Header */}
         <div className="mb-6 flex items-center justify-between">
@@ -98,7 +99,7 @@ export default function InvoicesPage() {
               عرض وإدارة جميع الفواتير في المتجر
             </p>
           </div>
-          <RequirePermission permission="ISSUE_INVOICE">
+          <RequirePermission permission={Permission.ISSUE_INVOICE}>
             <Link href="/invoices/new">
               <Button variant="primary" size="md" className="gap-2">
                 <Icon name="add" />
@@ -175,7 +176,7 @@ export default function InvoicesPage() {
                         <span>عرض</span>
                       </Link>
                       {invoice.status === 'UNPAID' && (
-                        <RequirePermission permission="SETTLE_INVOICE">
+                        <RequirePermission permission={Permission.SETTLE_INVOICE}>
                           <Button
                             variant="primary"
                             size="sm"

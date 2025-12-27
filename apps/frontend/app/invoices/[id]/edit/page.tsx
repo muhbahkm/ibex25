@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { RequirePermission } from '@/auth/RequirePermission'
+import { Permission } from '@/auth/roles'
 import { useAuth } from '@/auth/useAuth'
 import {
   fetchCustomers,
@@ -14,6 +15,14 @@ import {
   InvoiceDetail,
 } from '@/lib/api'
 import { formatCurrency } from '@/lib/format'
+import {
+  Button,
+  LoadingState,
+  EmptyState,
+  ErrorMessage,
+  StatusBadge,
+} from '@/components/ui'
+import Icon from '@/components/Icon'
 
 interface InvoiceItem {
   productId: string
@@ -204,13 +213,9 @@ export default function EditInvoicePage() {
 
   if (isLoading) {
     return (
-      <RequirePermission permission="ISSUE_INVOICE">
-        <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center py-12">
-              <p className="text-gray-500">جاري التحميل...</p>
-            </div>
-          </div>
+      <RequirePermission permission={Permission.ISSUE_INVOICE}>
+        <div className="max-w-4xl mx-auto">
+          <LoadingState message="جاري تحميل بيانات الفاتورة..." />
         </div>
       </RequirePermission>
     )
@@ -218,15 +223,13 @@ export default function EditInvoicePage() {
 
   if (!invoice) {
     return (
-      <RequirePermission permission="ISSUE_INVOICE">
-        <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-800">
-                {error || 'الفاتورة غير موجودة.'}
-              </p>
-            </div>
-          </div>
+      <RequirePermission permission={Permission.ISSUE_INVOICE}>
+        <div className="max-w-4xl mx-auto space-y-4">
+          <ErrorMessage message={error || 'الفاتورة غير موجودة.'} />
+          <Button variant="secondary" size="md" onClick={handleCancel}>
+            <Icon name="arrow_back" />
+            <span>العودة إلى القائمة</span>
+          </Button>
         </div>
       </RequirePermission>
     )
@@ -234,27 +237,22 @@ export default function EditInvoicePage() {
 
   if (invoice.status !== 'DRAFT') {
     return (
-      <RequirePermission permission="ISSUE_INVOICE">
-        <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold text-gray-900">
-                تعديل الفاتورة
-              </h1>
-            </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-sm text-yellow-800">
-                لا يمكن تعديل فاتورة بعد إصدارها
-              </p>
-            </div>
-            <div className="mt-4">
-              <button
-                onClick={handleCancel}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                العودة إلى القائمة
-              </button>
-            </div>
+      <RequirePermission permission={Permission.ISSUE_INVOICE}>
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div>
+            <h1 className="text-page-title mb-2">تعديل الفاتورة</h1>
+            <p className="text-muted">الفاتورة #{invoice.id}</p>
+          </div>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-body text-yellow-800">
+              لا يمكن تعديل فاتورة بعد إصدارها. الفواتير المصدرة لا يمكن تعديلها.
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="secondary" size="md" onClick={handleCancel}>
+              <Icon name="arrow_back" />
+              <span>العودة إلى القائمة</span>
+            </Button>
           </div>
         </div>
       </RequirePermission>
@@ -262,93 +260,97 @@ export default function EditInvoicePage() {
   }
 
   return (
-    <RequirePermission permission="ISSUE_INVOICE">
-      <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">تعديل الفاتورة</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              الحالة: <span className="font-medium">مسودة</span>
-            </p>
+    <RequirePermission permission={Permission.ISSUE_INVOICE}>
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Page Header */}
+        <div>
+          <h1 className="text-page-title mb-2">تعديل الفاتورة</h1>
+          <div className="flex items-center gap-4">
+            <p className="text-muted">الفاتورة #{invoice.id}</p>
+            <StatusBadge status={invoice.status} />
+          </div>
+        </div>
+
+        {/* Error State */}
+        {error && <ErrorMessage message={error} />}
+
+        {/* Invoice Form Card */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
+          {/* Customer Selection */}
+          <div className="p-6">
+            <label className="block text-xs font-medium text-gray-500 mb-2">
+              العميل (اختياري)
+            </label>
+            <select
+              value={selectedCustomerId || ''}
+              onChange={(e) =>
+                setSelectedCustomerId(e.target.value || null)
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-body"
+            >
+              <option value="">عميل نقدي</option>
+              {customers.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            {/* Customer Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                العميل (اختياري)
-              </label>
-              <select
-                value={selectedCustomerId || ''}
-                onChange={(e) =>
-                  setSelectedCustomerId(e.target.value || null)
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          {/* Invoice Items */}
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-section-title">العناصر</h2>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleAddItem}
+                disabled={products.length === 0}
+                className="gap-2"
               >
-                <option value="">عميل نقدي</option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </option>
-                ))}
-              </select>
+                <Icon name="add" />
+                <span>إضافة عنصر</span>
+              </Button>
             </div>
 
-            {/* Invoice Items */}
-            <div className="mb-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">العناصر</h2>
-                <button
-                  onClick={handleAddItem}
-                  disabled={products.length === 0}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  إضافة عنصر
-                </button>
-              </div>
-
-              {items.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  لا توجد عناصر. اضغط "إضافة عنصر" لبدء إضافة العناصر.
-                </div>
-              ) : (
+            {items.length === 0 ? (
+              <EmptyState
+                message="لا توجد عناصر"
+                description="اضغط على 'إضافة عنصر' لبدء إضافة العناصر إلى الفاتورة"
+              />
+            ) : (
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           المنتج
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           الكمية
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           سعر الوحدة
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           الإجمالي
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           الإجراءات
                         </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {items.map((item, index) => (
-                        <tr key={index}>
-                          <td className="px-4 py-4 whitespace-nowrap">
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <select
                               value={item.productId}
                               onChange={(e) =>
                                 handleItemChange(index, 'productId', e.target.value)
                               }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-body"
                             >
                               {products.map((product) => (
                                 <option key={product.id} value={product.id}>
@@ -357,7 +359,7 @@ export default function EditInvoicePage() {
                               ))}
                             </select>
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <input
                               type="number"
                               min="1"
@@ -369,24 +371,29 @@ export default function EditInvoicePage() {
                                   e.target.value,
                                 )
                               }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-body"
                             />
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatCurrency(Number(item.unitPrice))} ر.س
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-numeric">
+                              {formatCurrency(Number(item.unitPrice))} ر.س
+                            </span>
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {formatCurrency(
-                              calculateLineTotal(item.quantity, item.unitPrice),
-                            )}{' '}
-                            ر.س
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-numeric">
+                              {formatCurrency(
+                                calculateLineTotal(item.quantity, item.unitPrice),
+                              )}{' '}
+                              ر.س
+                            </span>
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <button
                               onClick={() => handleRemoveItem(index)}
-                              className="text-red-600 hover:text-red-800"
+                              className="inline-flex items-center gap-1.5 text-sm text-danger-600 hover:text-danger-700 transition-colors"
                             >
-                              حذف
+                              <Icon name="delete" className="text-base" />
+                              <span>حذف</span>
                             </button>
                           </td>
                         </tr>
@@ -394,38 +401,41 @@ export default function EditInvoicePage() {
                     </tbody>
                   </table>
                 </div>
-              )}
-            </div>
-
-            {/* Total */}
-            <div className="mb-6 border-t border-gray-200 pt-4">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-medium text-gray-900">
-                  الإجمالي:
-                </span>
-                <span className="text-lg font-bold text-gray-900">
-                  {formatCurrency(calculateTotal())} ر.س
-                </span>
               </div>
-            </div>
+            )}
+          </div>
 
-            {/* Actions */}
-            <div className="flex justify-end gap-4">
-              <button
-                onClick={handleCancel}
-                disabled={isSaving}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaving || items.length === 0}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSaving ? 'جاري الحفظ...' : 'حفظ مسودة'}
-              </button>
+          {/* Total */}
+          <div className="p-6 bg-gray-50">
+            <div className="flex justify-between items-center">
+              <span className="text-section-title">الإجمالي:</span>
+              <span className="text-section-title text-numeric">
+                {formatCurrency(calculateTotal())} ر.س
+              </span>
             </div>
+          </div>
+
+          {/* Actions */}
+          <div className="p-6 flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={handleCancel}
+              disabled={isSaving}
+            >
+              إلغاء
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleSave}
+              disabled={isSaving || items.length === 0}
+              isLoading={isSaving}
+              className="gap-2"
+            >
+              {!isSaving && <Icon name="save" />}
+              <span>حفظ مسودة</span>
+            </Button>
           </div>
         </div>
       </div>
